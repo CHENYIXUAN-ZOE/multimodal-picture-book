@@ -39,7 +39,7 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   AppSettings,
   BookPage,
@@ -1869,9 +1869,14 @@ function Workbench({
   return (
     <div className="workbench-shell">
       <header className="workbench-header">
-        <button className="back-button" onClick={onClose}>
+        <button
+          aria-label="返回绘本工坊"
+          className="back-button"
+          title="返回绘本工坊"
+          onClick={onClose}
+        >
           <ArrowLeft size={19} />
-          返回工坊
+          <span>返回工坊</span>
         </button>
         <div className="workbench-title">
           <span className="workbench-mark">
@@ -1884,34 +1889,48 @@ function Workbench({
           <StatusPill status={project.status} />
         </div>
         <div className="workbench-actions">
-          <button className="secondary-button" onClick={onRefresh}>
+          <button
+            aria-label="刷新项目"
+            className="secondary-button"
+            title="刷新项目"
+            onClick={onRefresh}
+          >
             <RefreshCw size={16} />
-            刷新
+            <span>刷新</span>
           </button>
           {pages.length ? (
             <>
               <button
+                aria-label="执行本地审核"
                 className="secondary-button"
                 disabled={busy === `audit-${project.id}`}
+                title="执行本地审核"
                 onClick={onAudit}
               >
                 <ShieldCheck size={16} />
-                本地审核
+                <span>本地审核</span>
               </button>
               <a
+                aria-label="导出资源包"
                 className="primary-button"
                 href={downloadUrl(`/exports/${project.id}/download`)}
                 target="_blank"
                 rel="noreferrer"
+                title="导出资源包"
               >
                 <Download size={16} />
-                导出资源包
+                <span>导出资源包</span>
               </a>
             </>
           ) : (
-            <button className="primary-button" onClick={onGenerate}>
+            <button
+              aria-label="开始生成"
+              className="primary-button"
+              title="开始生成"
+              onClick={onGenerate}
+            >
               <Play size={16} />
-              开始生成
+              <span>开始生成</span>
             </button>
           )}
         </div>
@@ -1946,7 +1965,6 @@ function Workbench({
               <article className="page-card" key={page.id}>
                 <button className="page-image" onClick={() => onEdit(page)}>
                   {page.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={page.imageUrl} alt={`${project.topic}第${page.pageIndex + 1}页`} />
                   ) : (
                     <span>
@@ -2060,16 +2078,17 @@ function PageEditor({
           </button>
         </div>
         <div className="editor-scroll">
-          <div className="editor-preview">
-            {draft.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={draft.imageUrl} alt={draft.title} />
-            ) : (
-              <div className="editor-image-empty">
-                <ImageIcon size={30} />
-                等待图片
-              </div>
-            )}
+          <div className="editor-visual">
+            <div className="editor-preview">
+              {draft.imageUrl ? (
+                <img src={draft.imageUrl} alt={draft.title} />
+              ) : (
+                <div className="editor-image-empty">
+                  <ImageIcon size={30} />
+                  等待图片
+                </div>
+              )}
+            </div>
             <div className="editor-image-actions">
               <button className="small-secondary" onClick={() => uploadRef.current?.click()}>
                 <Upload size={15} />
@@ -2104,41 +2123,43 @@ function PageEditor({
               if (file) void upload(file);
             }}
           />
-          <label className="field-label">
-            页面标题
-            <input
-              className="text-input"
-              value={draft.title}
-              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-            />
-          </label>
-          <label className="field-label">
-            页面正文
-            <textarea
-              className="text-area"
-              rows={7}
-              value={draft.text}
-              onChange={(event) => setDraft({ ...draft, text: event.target.value })}
-            />
-          </label>
-          <label className="field-label">
-            图片提示词
-            <textarea
-              className="text-area"
-              rows={6}
-              value={draft.imagePrompt}
-              onChange={(event) => setDraft({ ...draft, imagePrompt: event.target.value })}
-            />
-          </label>
-          <div className="audio-reserved-box">
-            <span>
-              <AudioLines size={20} />
-            </span>
-            <div>
-              <strong>音频接口已保留</strong>
-              <p>当前没有连接任何语音供应商，不会发出请求或产生费用。</p>
+          <div className="editor-fields">
+            <label className="field-label">
+              页面标题
+              <input
+                className="text-input"
+                value={draft.title}
+                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+              />
+            </label>
+            <label className="field-label">
+              页面正文
+              <textarea
+                className="text-area"
+                rows={7}
+                value={draft.text}
+                onChange={(event) => setDraft({ ...draft, text: event.target.value })}
+              />
+            </label>
+            <label className="field-label">
+              图片提示词
+              <textarea
+                className="text-area"
+                rows={6}
+                value={draft.imagePrompt}
+                onChange={(event) => setDraft({ ...draft, imagePrompt: event.target.value })}
+              />
+            </label>
+            <div className="audio-reserved-box">
+              <span>
+                <AudioLines size={20} />
+              </span>
+              <div>
+                <strong>音频接口已保留</strong>
+                <p>当前没有连接任何语音供应商，不会发出请求或产生费用。</p>
+              </div>
+              <em>DISABLED</em>
             </div>
-            <em>DISABLED</em>
           </div>
         </div>
         <div className="editor-footer">

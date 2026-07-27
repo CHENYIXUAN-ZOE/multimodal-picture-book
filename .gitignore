@@ -43,6 +43,7 @@ yarn-error.log*
 
 # security audit artifacts
 /security-reports/
+/audit-reports/
 
 # vercel
 .vercel
