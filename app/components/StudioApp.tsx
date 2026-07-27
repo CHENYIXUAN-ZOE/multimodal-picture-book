@@ -14,6 +14,8 @@ import {
   Clock3,
   CloudOff,
   Download,
+  Eye,
+  EyeOff,
   FileText,
   FolderKanban,
   Gauge,
@@ -44,6 +46,7 @@ import type {
   AppSettings,
   BookPage,
   DashboardSummary,
+  KimiConnectionResult,
   Project,
   QueueState,
   ServiceStatus,
@@ -594,11 +597,13 @@ export function StudioApp() {
               onSave={async (next) => {
                 setBusy("settings");
                 try {
-                  const response = await api<{ success: true; data: AppSettings }>("/settings", {
-                    method: "PATCH",
-                    ...jsonBody(next),
-                  });
+                  const response = await api<{
+                    success: true;
+                    data: AppSettings;
+                    services: ServiceStatus;
+                  }>("/settings", { method: "PATCH", ...jsonBody(next) });
                   setSettings(response.data);
+                  setServices(response.services);
                   await loadDashboard();
                   notify({ type: "success", message: "创作设置已保存到本机" });
                 } catch (error) {
@@ -610,7 +615,87 @@ export function StudioApp() {
                   setBusy("");
                 }
               }}
-              busy={busy === "settings"}
+              onConfigureKimi={async (input) => {
+                setBusy("kimi-key");
+                try {
+                  const response = await api<{
+                    success: true;
+                    data: AppSettings;
+                    services: ServiceStatus;
+                    connection: KimiConnectionResult;
+                  }>("/settings/kimi-key", {
+                    method: "POST",
+                    ...jsonBody(input),
+                  });
+                  setSettings(response.data);
+                  setServices(response.services);
+                  await loadDashboard();
+                  const balance = response.connection.balance;
+                  notify({
+                    type: "success",
+                    message: balance
+                      ? `Key 已验证并安全保存，可用余额 ¥${balance.available.toFixed(2)}`
+                      : "Key 已验证并安全保存，Kimi 创作模式已启用",
+                  });
+                  return true;
+                } catch (error) {
+                  notify({
+                    type: "error",
+                    message: error instanceof Error ? error.message : "Kimi Key 验证失败",
+                  });
+                  return false;
+                } finally {
+                  setBusy("");
+                }
+              }}
+              onTestKimi={async () => {
+                setBusy("kimi-test");
+                try {
+                  const response = await api<{
+                    success: true;
+                    data: KimiConnectionResult;
+                    services: ServiceStatus;
+                  }>("/settings/test-kimi", { method: "POST" });
+                  setServices(response.services);
+                  const balance = response.data.balance;
+                  notify({
+                    type: "success",
+                    message: balance
+                      ? `Kimi 连接正常，可用余额 ¥${balance.available.toFixed(2)}`
+                      : "Kimi 连接正常，所选模型可以使用",
+                  });
+                } catch (error) {
+                  notify({
+                    type: "error",
+                    message: error instanceof Error ? error.message : "Kimi 连接检测失败",
+                  });
+                } finally {
+                  setBusy("");
+                }
+              }}
+              onRemoveKimi={async () => {
+                if (!window.confirm("确定移除保存在本机的 Kimi API Key 吗？")) return;
+                setBusy("kimi-remove");
+                try {
+                  const response = await api<{
+                    success: true;
+                    data: AppSettings;
+                    services: ServiceStatus;
+                  }>("/settings/kimi-key", { method: "DELETE" });
+                  setSettings(response.data);
+                  setServices(response.services);
+                  await loadDashboard();
+                  notify({ type: "success", message: "本机 Kimi API Key 已移除" });
+                } catch (error) {
+                  notify({
+                    type: "error",
+                    message: error instanceof Error ? error.message : "移除 Key 失败",
+                  });
+                } finally {
+                  setBusy("");
+                }
+              }}
+              busy={busy}
             />
           ) : null}
         </div>
@@ -1434,25 +1519,45 @@ function SettingsView({
   settings,
   services,
   onSave,
+  onConfigureKimi,
+  onTestKimi,
+  onRemoveKimi,
   busy,
 }: {
   settings: AppSettings;
   services: ServiceStatus | null;
   onSave: (settings: AppSettings) => void;
-  busy: boolean;
+  onConfigureKimi: (input: {
+    apiKey: string;
+    region: "cn" | "global";
+    model: string;
+  }) => Promise<boolean>;
+  onTestKimi: () => void;
+  onRemoveKimi: () => void;
+  busy: string;
 }) {
   const [draft, setDraft] = useState(settings);
+  const [apiKey, setApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
   useEffect(() => setDraft(settings), [settings]);
+  const savingSettings = busy === "settings";
+  const configuringKey = busy === "kimi-key";
+  const testingKey = busy === "kimi-test";
+  const removingKey = busy === "kimi-remove";
   return (
     <div className="view-stack">
       <section className="page-intro settings-intro">
         <div>
           <span className="section-kicker">CREATION SETTINGS</span>
           <h2>把风格、成本和安全边界，都握在自己手里。</h2>
-          <p>密钥不会进入页面或数据库；这里只有不敏感的创作参数。</p>
+          <p>密钥只在填写时短暂经过页面，验证后由本机服务端单独保管。</p>
         </div>
-        <button className="primary-button" onClick={() => onSave(draft)} disabled={busy}>
-          {busy ? <RefreshCw className="spin" size={17} /> : <Save size={17} />}
+        <button
+          className="primary-button"
+          onClick={() => onSave(draft)}
+          disabled={Boolean(busy)}
+        >
+          {savingSettings ? <RefreshCw className="spin" size={17} /> : <Save size={17} />}
           保存设置
         </button>
       </section>
@@ -1467,6 +1572,96 @@ function SettingsView({
               <h3>Kimi 文本服务</h3>
               <p>仅负责文案、图片提示词和内容审核</p>
             </div>
+          </div>
+          <div className="kimi-key-panel">
+            <label className="field-label">
+              Kimi API Key
+              <div className="secret-input-wrap">
+                <input
+                  className="text-input"
+                  type={showApiKey ? "text" : "password"}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={
+                    services?.kimi.configured
+                      ? `已保存 ${services.kimi.keyHint || "本机密钥"}；输入新 Key 可替换`
+                      : "粘贴从 Kimi 开放平台创建的 API Key"
+                  }
+                  value={apiKey}
+                  onChange={(event) => setApiKey(event.target.value)}
+                />
+                <button
+                  aria-label={showApiKey ? "隐藏 API Key" : "显示 API Key"}
+                  className="secret-visibility-button"
+                  type="button"
+                  onClick={() => setShowApiKey((value) => !value)}
+                >
+                  {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </label>
+            <label className="field-label">
+              Key 所属平台
+              <select
+                className="text-input"
+                value={draft.kimiRegion}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    kimiRegion: event.target.value as "cn" | "global",
+                  })
+                }
+              >
+                <option value="cn">国内站 platform.kimi.com</option>
+                <option value="global">国际站 platform.kimi.ai</option>
+              </select>
+            </label>
+            <div className="kimi-key-actions">
+              <button
+                className="small-primary"
+                type="button"
+                disabled={!apiKey.trim() || Boolean(busy)}
+                onClick={async () => {
+                  const saved = await onConfigureKimi({
+                    apiKey,
+                    region: draft.kimiRegion,
+                    model: draft.model,
+                  });
+                  if (saved) {
+                    setApiKey("");
+                    setShowApiKey(false);
+                  }
+                }}
+              >
+                {configuringKey ? <RefreshCw className="spin" size={15} /> : <ShieldCheck size={15} />}
+                验证并保存
+              </button>
+              {services?.kimi.configured ? (
+                <button
+                  className="small-secondary"
+                  type="button"
+                  disabled={Boolean(busy)}
+                  onClick={onTestKimi}
+                >
+                  {testingKey ? <RefreshCw className="spin" size={15} /> : <RefreshCw size={15} />}
+                  检测连接
+                </button>
+              ) : null}
+              {services?.kimi.keySource === "local-secret-file" ? (
+                <button
+                  className="small-secondary key-remove-button"
+                  type="button"
+                  disabled={Boolean(busy)}
+                  onClick={onRemoveKimi}
+                >
+                  {removingKey ? <RefreshCw className="spin" size={15} /> : <Trash2 size={15} />}
+                  移除 Key
+                </button>
+              ) : null}
+            </div>
+            <p className="key-storage-caption">
+              验证通过后仅写入本机受限文件，不进入 SQLite、浏览器存储、日志、导出包或 Git。
+            </p>
           </div>
           <div className="settings-status-grid">
             <div>
@@ -1491,8 +1686,8 @@ function SettingsView({
           <div className="security-note">
             <KeyRound size={18} />
             <div>
-              <strong>密钥只从本机 .env.local 读取</strong>
-              <span>页面无法查看、显示或导出密钥，也不会写入 Git。</span>
+              <strong>密钥只在本机服务端使用</strong>
+              <span>保存后页面只能看到末四位提示，完整 Key 不会通过接口返回。</span>
             </div>
           </div>
           <label className="field-label">
@@ -1503,7 +1698,20 @@ function SettingsView({
               onChange={(event) => setDraft({ ...draft, model: event.target.value })}
             >
               <option value="kimi-k2.6">kimi-k2.6（推荐，通用与成本平衡）</option>
-              <option value="kimi-k3">kimi-k3（长程推理，费用更高）</option>
+              <option value="kimi-k3">kimi-k3（旗舰推理，需要充值解锁）</option>
+            </select>
+          </label>
+          <label className="field-label">
+            Kimi 调用开关
+            <select
+              className="text-input"
+              value={draft.kimiEnabled ? "enabled" : "disabled"}
+              onChange={(event) =>
+                setDraft({ ...draft, kimiEnabled: event.target.value === "enabled" })
+              }
+            >
+              <option value="enabled">启用（每次生成仍需确认费用）</option>
+              <option value="disabled">关闭（保留 Key，不允许调用）</option>
             </select>
           </label>
           <label className="field-label">

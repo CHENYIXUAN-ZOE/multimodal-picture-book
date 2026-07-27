@@ -35,6 +35,7 @@ yarn-error.log*
 # single-machine runtime data
 /data/*.sqlite
 /data/*.sqlite-*
+/.secrets/
 /data/runtime/
 /storage/
 /logs/

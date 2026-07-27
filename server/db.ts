@@ -122,6 +122,8 @@ const defaults: AppSettings = {
   storyPageCount: 8,
   imageStyle: DEFAULT_IMAGE_STYLE,
   model: "kimi-k2.6",
+  kimiEnabled: false,
+  kimiRegion: "cn",
   generationMode: "local",
   dailyAiCallLimit: 20,
   sciencePrompt: DEFAULT_SCIENCE_PROMPT,

@@ -46,6 +46,30 @@ test("runtime secrets and generated assets are ignored", async () => {
   const ignore = await load(".gitignore");
   assert.match(ignore, /^\.env\*$/m);
   assert.match(ignore, /^!\.env\.example$/m);
+  assert.match(ignore, /^\/\.secrets\/$/m);
   assert.match(ignore, /^\/data\/\*\.sqlite$/m);
   assert.match(ignore, /^\/storage\/$/m);
+});
+
+test("settings API never persists or returns the full Kimi key", async () => {
+  const [server, secrets] = await Promise.all([
+    load("server/index.ts"),
+    load("server/secrets.ts"),
+  ]);
+  assert.match(server, /req\.body\.apiKey/);
+  assert.match(server, /saveKimiApiKey\(body\.apiKey\)/);
+  assert.doesNotMatch(server, /data:\s*body\.apiKey/);
+  assert.match(secrets, /mode:\s*0o600/);
+  assert.match(secrets, /hint:\s*key\s*\?\s*`••••\$\{key\.slice\(-4\)\}`/);
+});
+
+test("Kimi production requests use current model-specific parameters", async () => {
+  const kimi = await load("server/kimi.ts");
+  assert.match(kimi, /max_completion_tokens:\s*12_000/);
+  assert.doesNotMatch(kimi, /\bmax_tokens:\s*12_000/);
+  assert.match(kimi, /configuration\.model === "kimi-k3"/);
+  assert.match(kimi, /body\.reasoning_effort = "low"/);
+  assert.match(kimi, /configuration\.model === "kimi-k2\.6"/);
+  assert.match(kimi, /body\.thinking = \{ type: "disabled" \}/);
+  assert.match(kimi, /fetch\(`\$\{baseUrl\}\/models`/);
 });

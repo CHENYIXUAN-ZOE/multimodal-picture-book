@@ -98,10 +98,23 @@ export interface AppSettings {
   storyPageCount: number;
   imageStyle: string;
   model: string;
+  kimiEnabled: boolean;
+  kimiRegion: "cn" | "global";
   generationMode: "local" | "kimi";
   dailyAiCallLimit: number;
   sciencePrompt: string;
   storyPrompt: string;
+}
+
+export interface KimiConnectionResult {
+  ok: true;
+  availableModels: string[];
+  selectedModelAvailable: boolean;
+  balance: {
+    available: number;
+    cash: number;
+    voucher: number;
+  } | null;
 }
 
 export interface ServiceStatus {
@@ -110,6 +123,8 @@ export interface ServiceStatus {
   kimi: {
     configured: boolean;
     enabled: boolean;
+    keySource: "local-secret-file" | "environment" | null;
+    keyHint: string | null;
     model: string;
     callsToday: number;
     dailyLimit: number;

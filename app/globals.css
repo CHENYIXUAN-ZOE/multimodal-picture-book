@@ -1830,6 +1830,62 @@ select.text-input {
   background: var(--mint-soft);
 }
 
+.kimi-key-panel {
+  display: grid;
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid #ded5f1;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 92% 10%, rgba(119, 91, 218, 0.09), transparent 32%),
+    #fcfaff;
+}
+
+.secret-input-wrap {
+  position: relative;
+}
+
+.secret-input-wrap .text-input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.secret-visibility-button {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  color: #736985;
+  transform: translateY(-50%);
+}
+
+.secret-visibility-button:hover {
+  color: var(--violet);
+  background: var(--violet-soft);
+}
+
+.kimi-key-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.key-remove-button {
+  color: #9a4654;
+}
+
+.key-storage-caption {
+  margin: 0;
+  color: #776c86;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
 .audio-reserved-box {
   color: #81611f;
   background: var(--yellow-soft);

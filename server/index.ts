@@ -34,7 +34,8 @@ import {
 import { auditWithKimi, testKimiConnection } from "./kimi";
 import { getQueueState, setQueuePaused } from "./queue";
 import { createPlaceholder } from "./placeholder";
-import type { AppSettings, AuditIssue } from "../shared/types";
+import { getKimiSecretStatus, removeKimiApiKey, saveKimiApiKey } from "./secrets";
+import type { AppSettings, AuditIssue, KimiConnectionResult } from "../shared/types";
 
 const app = Fastify({
   logger: {
@@ -45,6 +46,20 @@ const app = Fastify({
     },
   },
   bodyLimit: 20 * 1024 * 1024,
+});
+
+app.setErrorHandler((error, request, reply) => {
+  const failure = error instanceof Error ? error : new Error("本地服务处理失败");
+  const statusCode = (failure as Error & { statusCode?: number }).statusCode;
+  const status = statusCode && statusCode >= 400 ? statusCode : 500;
+  request.log.error(
+    { errorName: failure.name, statusCode: status },
+    "本地 API 请求处理失败",
+  );
+  return reply.code(status).send({
+    success: false,
+    error: failure.message || "本地服务处理失败",
+  });
 });
 
 await app.register(multipart, {
@@ -74,16 +89,19 @@ app.get("/api/v1/health", async () => ({
 
 function serviceStatus() {
   const settings = getSettings();
+  const secret = getKimiSecretStatus();
   return {
     localOnly: true as const,
     database: "ready" as const,
     kimi: {
-      configured: Boolean(env.moonshotApiKey),
-      enabled: env.aiCallsEnabled,
+      configured: secret.configured,
+      enabled: secret.configured && (settings.kimiEnabled || env.aiCallsEnabled),
+      keySource: secret.source,
+      keyHint: secret.hint,
       model: settings.model,
       callsToday: getCallsToday(),
       dailyLimit: Math.min(settings.dailyAiCallLimit, env.dailyAiCallLimit),
-      endpointRegion: env.kimiRegion,
+      endpointRegion: settings.kimiRegion,
     },
     image: {
       provider: "local-placeholder" as const,
@@ -237,6 +255,12 @@ app.post("/api/v1/projects/:id/generate", async (request, reply) => {
       .code(400)
       .send({ success: false, error: "必须明确确认本次 Kimi 调用可能产生费用" });
   }
+  if (mode === "kimi" && !serviceStatus().kimi.enabled) {
+    return reply.code(400).send({
+      success: false,
+      error: "Kimi 尚未启用，请先在创作设置中验证并保存 API Key",
+    });
+  }
   return {
     success: true,
     data: createTask(id, mode, Boolean(body.acknowledgeCost)),
@@ -271,6 +295,12 @@ app.post("/api/v1/projects/:id/audit", async (request, reply) => {
       return reply
         .code(400)
         .send({ success: false, error: "必须明确确认本次 Kimi 调用可能产生费用" });
+    }
+    if (!serviceStatus().kimi.enabled) {
+      return reply.code(400).send({
+        success: false,
+        error: "Kimi 尚未启用，请先在创作设置中验证并保存 API Key",
+      });
     }
     const result = await auditWithKimi({
       topic: project.topic,
@@ -386,16 +416,75 @@ app.get("/api/v1/settings", async () => ({
   services: serviceStatus(),
 }));
 
-app.patch("/api/v1/settings", async (request) => ({
-  success: true,
-  data: updateSettings(request.body as Partial<AppSettings>),
-}));
-
-app.post("/api/v1/settings/test-kimi", async (request) => {
-  const body = (request.body || {}) as { acknowledgeCost?: boolean };
+app.patch("/api/v1/settings", async (request, reply) => {
+  const updates = (request.body || {}) as Partial<AppSettings>;
+  if (updates.kimiRegion && !["cn", "global"].includes(updates.kimiRegion)) {
+    return reply.code(400).send({ success: false, error: "请选择正确的 Kimi API 区域" });
+  }
+  if (updates.model && !["kimi-k2.6", "kimi-k3"].includes(updates.model)) {
+    return reply.code(400).send({ success: false, error: "当前版本只支持 kimi-k2.6 或 kimi-k3" });
+  }
   return {
     success: true,
-    data: await testKimiConnection(Boolean(body.acknowledgeCost)),
+    data: updateSettings(updates),
+    services: serviceStatus(),
+  };
+});
+
+app.post("/api/v1/settings/kimi-key", async (request, reply) => {
+  const body = (request.body || {}) as {
+    apiKey?: string;
+    region?: "cn" | "global";
+    model?: string;
+  };
+  if (!body.apiKey?.trim()) {
+    return reply.code(400).send({ success: false, error: "请填写 Kimi API Key" });
+  }
+  const region = body.region === "global" ? "global" : "cn";
+  const model = ["kimi-k2.6", "kimi-k3"].includes(body.model || "")
+    ? String(body.model)
+    : getSettings().model;
+  const result = await testKimiConnection({ apiKey: body.apiKey, region, model });
+  if (!result.selectedModelAvailable) {
+    return reply.code(400).send({
+      success: false,
+      error: `Key 有效，但当前账号没有 ${model} 模型权限，请换一个模型后重试`,
+    });
+  }
+  saveKimiApiKey(body.apiKey);
+  const data = updateSettings({
+    kimiEnabled: true,
+    kimiRegion: region,
+    generationMode: "kimi",
+    model,
+  });
+  return {
+    success: true,
+    data,
+    services: serviceStatus(),
+    connection: result,
+  };
+});
+
+app.delete("/api/v1/settings/kimi-key", async (request, reply) => {
+  const secret = getKimiSecretStatus();
+  if (secret.source === "environment") {
+    return reply.code(409).send({
+      success: false,
+      error: "当前 Key 来自 .env.local，请在该文件中移除后重启本地服务",
+    });
+  }
+  removeKimiApiKey();
+  const data = updateSettings({ kimiEnabled: false, generationMode: "local" });
+  return { success: true, data, services: serviceStatus() };
+});
+
+app.post("/api/v1/settings/test-kimi", async () => {
+  const data: KimiConnectionResult = await testKimiConnection();
+  return {
+    success: true,
+    data,
+    services: serviceStatus(),
   };
 });
 

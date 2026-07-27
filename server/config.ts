@@ -13,7 +13,7 @@ const integer = (value: string | undefined, fallback: number) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const officialKimiEndpoints = new Map([
+export const officialKimiEndpoints = new Map([
   ["https://api.moonshot.cn/v1", "cn"],
   ["https://api.moonshot.ai/v1", "global"],
 ] as const);
@@ -38,6 +38,10 @@ export const env = {
   audioProvider: "disabled" as const,
 };
 
+export function getKimiBaseUrl(region: "cn" | "global") {
+  return region === "global" ? "https://api.moonshot.ai/v1" : "https://api.moonshot.cn/v1";
+}
+
 export const paths = {
   data: path.join(projectRoot, "data"),
   database: path.join(projectRoot, "data", "multimodal-picture-book.sqlite"),
@@ -45,6 +49,8 @@ export const paths = {
   storage: path.join(projectRoot, "storage"),
   projects: path.join(projectRoot, "storage", "projects"),
   exports: path.join(projectRoot, "storage", "exports"),
+  secrets: path.join(projectRoot, ".secrets"),
+  kimiApiKey: path.join(projectRoot, ".secrets", "kimi-api-key"),
 };
 
 for (const directory of [paths.data, paths.storage, paths.projects, paths.exports]) {
