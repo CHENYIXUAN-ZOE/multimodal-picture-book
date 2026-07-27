@@ -73,3 +73,28 @@ test("Kimi production requests use current model-specific parameters", async () 
   assert.match(kimi, /body\.thinking = \{ type: "disabled" \}/);
   assert.match(kimi, /fetch\(`\$\{baseUrl\}\/models`/);
 });
+
+test("full prompt system and consistency metadata are part of production generation", async () => {
+  const [presets, prompts, kimi, database, settingsUi] = await Promise.all([
+    load("server/prompt-presets.ts"),
+    load("server/prompts.ts"),
+    load("server/kimi.ts"),
+    load("server/db.ts"),
+    load("app/components/StudioApp.tsx"),
+  ]);
+
+  assert.match(presets, /主题知识维度框架/);
+  assert.match(presets, /禁止的故事套路/);
+  assert.match(presets, /imagePrompt 必须从该页正文的核心知识点推导/);
+  assert.match(prompts, /scienceImagePromptGuide/);
+  assert.match(prompts, /storyImagePromptGuide/);
+  assert.match(prompts, /consistencySettings/);
+  assert.match(prompts, /charactersInScene/);
+  assert.match(prompts, /emotion/);
+  assert.match(kimi, /normalizeConsistency/);
+  assert.match(database, /consistency_settings_json/);
+  assert.match(database, /characters_in_scene_json/);
+  assert.match(settingsUi, /scienceNegativePrompt/);
+  assert.match(settingsUi, /storyNegativePrompt/);
+  assert.match(settingsUi, /scienceKnowledgePointCountMin/);
+});

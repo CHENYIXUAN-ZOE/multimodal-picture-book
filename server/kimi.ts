@@ -2,7 +2,11 @@ import { env, getKimiBaseUrl } from "./config";
 import { getCallsToday, getSettings, recordUsage } from "./db";
 import { buildAuditPrompt, buildBookPrompt } from "./prompts";
 import { readKimiApiKey, validateKimiApiKey } from "./secrets";
-import type { KimiConnectionResult } from "../shared/types";
+import type {
+  ConsistencySettings,
+  CoreSubject,
+  KimiConnectionResult,
+} from "../shared/types";
 
 type KimiUsage = {
   prompt_tokens?: number;
@@ -139,19 +143,36 @@ export async function generateWithKimi(
       targetAge: settings.targetAge,
       sciencePageCount: settings.sciencePageCount,
       storyPageCount: settings.storyPageCount,
+      scienceKnowledgePointCountMin: settings.scienceKnowledgePointCountMin,
+      scienceKnowledgePointCountMax: settings.scienceKnowledgePointCountMax,
       sciencePrompt: settings.sciencePrompt,
       storyPrompt: settings.storyPrompt,
-      imageStyle: settings.imageStyle,
+      scienceImageStylePrompt: settings.scienceImageStylePrompt,
+      scienceNegativePrompt: settings.scienceNegativePrompt,
+      scienceImagePromptGuide: settings.scienceImagePromptGuide,
+      storyImageStylePrompt: settings.storyImageStylePrompt,
+      storyNegativePrompt: settings.storyNegativePrompt,
+      storyImagePromptGuide: settings.storyImagePromptGuide,
     }),
     acknowledgeCost: input.acknowledgeCost,
     json: true,
   });
+  type RawConsistency = Partial<ConsistencySettings> & {
+    coreSubjects?: Array<Partial<CoreSubject>>;
+  };
+  type RawPage = {
+    title?: string;
+    text?: string;
+    imagePrompt?: string;
+    charactersInScene?: unknown;
+    emotion?: string;
+  };
   const parsed = JSON.parse(content) as {
-    science?: { pages?: Array<{ title?: string; text?: string; imagePrompt?: string }> };
-    story?: { pages?: Array<{ title?: string; text?: string; imagePrompt?: string }> };
+    science?: { consistencySettings?: RawConsistency; pages?: RawPage[] };
+    story?: { consistencySettings?: RawConsistency; pages?: RawPage[] };
   };
   const normalize = (
-    pages: Array<{ title?: string; text?: string; imagePrompt?: string }> | undefined,
+    pages: RawPage[] | undefined,
     expected: number,
   ) => {
     if (!Array.isArray(pages) || pages.length !== expected) {
@@ -161,9 +182,49 @@ export async function generateWithKimi(
       title: String(page.title || `第 ${index + 1} 页`),
       text: String(page.text || ""),
       imagePrompt: String(page.imagePrompt || ""),
+      charactersInScene: Array.isArray(page.charactersInScene)
+        ? page.charactersInScene.map(String).filter(Boolean)
+        : [],
+      emotion: String(page.emotion || ""),
     }));
   };
+  const normalizeConsistency = (
+    value: RawConsistency | undefined,
+    fallbackArtStyle: string,
+  ): ConsistencySettings | null => {
+    if (!value) return null;
+    const allowedTypes = new Set(["character_story", "lifecycle", "concept", "comparison"]);
+    const type = allowedTypes.has(String(value.type))
+      ? (value.type as ConsistencySettings["type"])
+      : "concept";
+    return {
+      type,
+      narrativeReason: value.narrativeReason ? String(value.narrativeReason) : undefined,
+      coreSubjects: Array.isArray(value.coreSubjects)
+        ? value.coreSubjects.map((subject) => ({
+            name: String(subject.name || ""),
+            headFeatures: String(subject.headFeatures || ""),
+            bodyType: String(subject.bodyType || ""),
+            otherFeatures: String(subject.otherFeatures || ""),
+            personality: subject.personality ? String(subject.personality) : undefined,
+          }))
+        : [],
+      artStyle: String(value.artStyle || fallbackArtStyle),
+      colorPalette: String(value.colorPalette || ""),
+      storyTheme: value.storyTheme ? String(value.storyTheme) : undefined,
+    };
+  };
   return {
+    consistencySettings: {
+      science: normalizeConsistency(
+        parsed.science?.consistencySettings,
+        settings.scienceImageStylePrompt,
+      ),
+      story: normalizeConsistency(
+        parsed.story?.consistencySettings,
+        settings.storyImageStylePrompt,
+      ),
+    },
     science: normalize(parsed.science?.pages, settings.sciencePageCount),
     story: normalize(parsed.story?.pages, settings.storyPageCount),
   };

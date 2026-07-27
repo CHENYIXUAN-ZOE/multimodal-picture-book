@@ -615,6 +615,33 @@ export function StudioApp() {
                   setBusy("");
                 }
               }}
+              onResetPrompts={async () => {
+                if (
+                  !window.confirm(
+                    "确定恢复完整默认提示词吗？当前自定义的提示词、图片风格和负向词会被覆盖。",
+                  )
+                ) {
+                  return;
+                }
+                setBusy("prompt-reset");
+                try {
+                  const response = await api<{
+                    success: true;
+                    data: AppSettings;
+                    services: ServiceStatus;
+                  }>("/settings/reset-prompts", { method: "POST" });
+                  setSettings(response.data);
+                  setServices(response.services);
+                  notify({ type: "success", message: "完整提示词预设已恢复" });
+                } catch (error) {
+                  notify({
+                    type: "error",
+                    message: error instanceof Error ? error.message : "恢复预设失败",
+                  });
+                } finally {
+                  setBusy("");
+                }
+              }}
               onConfigureKimi={async (input) => {
                 setBusy("kimi-key");
                 try {
@@ -1519,6 +1546,7 @@ function SettingsView({
   settings,
   services,
   onSave,
+  onResetPrompts,
   onConfigureKimi,
   onTestKimi,
   onRemoveKimi,
@@ -1527,6 +1555,7 @@ function SettingsView({
   settings: AppSettings;
   services: ServiceStatus | null;
   onSave: (settings: AppSettings) => void;
+  onResetPrompts: () => void;
   onConfigureKimi: (input: {
     apiKey: string;
     region: "cn" | "global";
@@ -1539,6 +1568,7 @@ function SettingsView({
   const [draft, setDraft] = useState(settings);
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
+  const [promptTab, setPromptTab] = useState<"science" | "story">("science");
   useEffect(() => setDraft(settings), [settings]);
   const savingSettings = busy === "settings";
   const configuringKey = busy === "kimi-key";
@@ -1800,18 +1830,106 @@ function SettingsView({
             </span>
             <div>
               <h3>图片风格与接口状态</h3>
-              <p>Kimi 官方当前只支持图片理解，不提供图片生成</p>
+              <p>分别控制科普与故事图片提示词；图片接口仍保持本地安全模式</p>
             </div>
           </div>
-          <label className="field-label">
-            统一图片风格提示词
-            <textarea
-              className="text-area"
-              rows={4}
-              value={draft.imageStyle}
-              onChange={(event) => setDraft({ ...draft, imageStyle: event.target.value })}
-            />
-          </label>
+          <div className="style-preset-list" aria-label="图片风格预设">
+            {draft.imageStylePresets.map((preset) => (
+              <button
+                key={preset.name}
+                type="button"
+                className="style-preset-chip"
+                onClick={() =>
+                  setDraft({
+                    ...draft,
+                    scienceImageStyle: preset.name,
+                    scienceImageStylePrompt: preset.stylePrompt,
+                    scienceNegativePrompt: preset.negativePrompt,
+                  })
+                }
+              >
+                {preset.name}
+                <span>应用到科普</span>
+              </button>
+            ))}
+          </div>
+          <div className="prompt-grid image-config-grid">
+            <div className="prompt-config-panel science-config-panel">
+              <div className="prompt-config-heading">
+                <strong>🔬 科普图片</strong>
+                <span>{draft.scienceImageStyle}</span>
+              </div>
+              <label className="field-label">
+                正向风格提示词
+                <textarea
+                  className="text-area"
+                  rows={5}
+                  value={draft.scienceImageStylePrompt}
+                  onChange={(event) =>
+                    setDraft({ ...draft, scienceImageStylePrompt: event.target.value })
+                  }
+                />
+              </label>
+              <label className="field-label">
+                负向提示词
+                <textarea
+                  className="text-area compact-prompt-area"
+                  rows={3}
+                  value={draft.scienceNegativePrompt}
+                  onChange={(event) =>
+                    setDraft({ ...draft, scienceNegativePrompt: event.target.value })
+                  }
+                />
+              </label>
+            </div>
+            <div className="prompt-config-panel story-config-panel">
+              <div className="prompt-config-heading">
+                <strong>📖 故事图片</strong>
+                <span>{draft.storyImageStyle}</span>
+              </div>
+              <div className="story-style-actions">
+                {draft.imageStylePresets.map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    className={draft.storyImageStyle === preset.name ? "is-active" : ""}
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        storyImageStyle: preset.name,
+                        storyImageStylePrompt: preset.stylePrompt,
+                        storyNegativePrompt: preset.negativePrompt,
+                      })
+                    }
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+              <label className="field-label">
+                正向风格提示词
+                <textarea
+                  className="text-area"
+                  rows={5}
+                  value={draft.storyImageStylePrompt}
+                  onChange={(event) =>
+                    setDraft({ ...draft, storyImageStylePrompt: event.target.value })
+                  }
+                />
+              </label>
+              <label className="field-label">
+                负向提示词
+                <textarea
+                  className="text-area compact-prompt-area"
+                  rows={3}
+                  value={draft.storyNegativePrompt}
+                  onChange={(event) =>
+                    setDraft({ ...draft, storyNegativePrompt: event.target.value })
+                  }
+                />
+              </label>
+            </div>
+          </div>
           <div className="provider-strip">
             <div>
               <span className="provider-icon provider-image">
@@ -1843,27 +1961,125 @@ function SettingsView({
             </span>
             <div>
               <h3>提示词工作台</h3>
-              <p>保留原项目的创作原则，重新整理为更清晰的模板</p>
+              <p>完整恢复原项目的创作规则、图片描述指南与结构化输出</p>
             </div>
+            <button
+              type="button"
+              className="small-secondary settings-title-action"
+              disabled={Boolean(busy)}
+              onClick={onResetPrompts}
+            >
+              {busy === "prompt-reset" ? (
+                <RefreshCw className="spin" size={14} />
+              ) : (
+                <RotateCcw size={14} />
+              )}
+              恢复完整预设
+            </button>
           </div>
-          <div className="prompt-grid">
-            <label className="field-label">
-              科普绘本提示词
-              <textarea
-                className="text-area prompt-area"
-                value={draft.sciencePrompt}
-                onChange={(event) => setDraft({ ...draft, sciencePrompt: event.target.value })}
-              />
-            </label>
-            <label className="field-label">
-              故事绘本提示词
-              <textarea
-                className="text-area prompt-area"
-                value={draft.storyPrompt}
-                onChange={(event) => setDraft({ ...draft, storyPrompt: event.target.value })}
-              />
-            </label>
+          <div className="prompt-tab-list" role="tablist" aria-label="提示词类型">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={promptTab === "science"}
+              className={promptTab === "science" ? "is-active" : ""}
+              onClick={() => setPromptTab("science")}
+            >
+              🔬 科普绘本
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={promptTab === "story"}
+              className={promptTab === "story" ? "is-active" : ""}
+              onClick={() => setPromptTab("story")}
+            >
+              📖 故事绘本
+            </button>
           </div>
+          {promptTab === "science" ? (
+            <div className="prompt-workbench-panel" role="tabpanel">
+              <div className="two-field-row prompt-count-row">
+                <label className="field-label">
+                  知识点最少数量
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={draft.scienceKnowledgePointCountMin}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        scienceKnowledgePointCountMin: Number(event.target.value),
+                      })
+                    }
+                  />
+                </label>
+                <label className="field-label">
+                  知识点最多数量
+                  <input
+                    className="text-input"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={draft.scienceKnowledgePointCountMax}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        scienceKnowledgePointCountMax: Number(event.target.value),
+                      })
+                    }
+                  />
+                </label>
+              </div>
+              <label className="field-label">
+                科普系统提示词
+                <textarea
+                  className="text-area prompt-area"
+                  value={draft.sciencePrompt}
+                  onChange={(event) =>
+                    setDraft({ ...draft, sciencePrompt: event.target.value })
+                  }
+                />
+                <span className="field-help">可用变量：{"{age}"}</span>
+              </label>
+              <label className="field-label">
+                科普图片描述生成指南
+                <textarea
+                  className="text-area prompt-guide-area"
+                  value={draft.scienceImagePromptGuide}
+                  onChange={(event) =>
+                    setDraft({ ...draft, scienceImagePromptGuide: event.target.value })
+                  }
+                />
+              </label>
+            </div>
+          ) : (
+            <div className="prompt-workbench-panel" role="tabpanel">
+              <label className="field-label">
+                故事系统提示词
+                <textarea
+                  className="text-area prompt-area"
+                  value={draft.storyPrompt}
+                  onChange={(event) =>
+                    setDraft({ ...draft, storyPrompt: event.target.value })
+                  }
+                />
+                <span className="field-help">可用变量：{"{age}"}</span>
+              </label>
+              <label className="field-label">
+                故事图片描述生成指南
+                <textarea
+                  className="text-area prompt-guide-area"
+                  value={draft.storyImagePromptGuide}
+                  onChange={(event) =>
+                    setDraft({ ...draft, storyImagePromptGuide: event.target.value })
+                  }
+                />
+              </label>
+            </div>
+          )}
         </section>
       </div>
     </div>
@@ -2074,6 +2290,7 @@ function Workbench({
   onRefresh: () => void;
 }) {
   const pages = (project.pages || []).filter((page) => page.contentType === tab);
+  const consistency = project.consistencySettings?.[tab] || null;
   return (
     <div className="workbench-shell">
       <header className="workbench-header">
@@ -2166,6 +2383,29 @@ function Workbench({
             : "让知识走进角色、挑战与温暖结尾，变成可以反复讲的故事。"}
         </p>
       </div>
+      {consistency ? (
+        <div className="consistency-strip">
+          <div>
+            <span>统一画风</span>
+            <strong>{consistency.artStyle || "已按提示词锁定"}</strong>
+          </div>
+          <div>
+            <span>{tab === "story" ? "故事立意" : "内容类型"}</span>
+            <strong>
+              {tab === "story"
+                ? consistency.storyTheme || "由主题自然生成"
+                : consistency.type}
+            </strong>
+          </div>
+          <div>
+            <span>核心角色 / 主体</span>
+            <strong>
+              {consistency.coreSubjects.map((subject) => subject.name).filter(Boolean).join("、") ||
+                "无固定角色"}
+            </strong>
+          </div>
+        </div>
+      ) : null}
       <div className="workbench-body">
         {pages.length ? (
           <div className="page-grid">
@@ -2186,6 +2426,14 @@ function Workbench({
                 <div className="page-copy">
                   <strong>{page.title}</strong>
                   <p>{page.text}</p>
+                  {page.emotion || page.charactersInScene.length ? (
+                    <div className="page-context-chips">
+                      {page.emotion ? <span>情绪 · {page.emotion}</span> : null}
+                      {page.charactersInScene.length ? (
+                        <span>出场 · {page.charactersInScene.join("、")}</span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="page-footer">
                   <span className={page.imageUrl ? "asset-ready" : ""}>

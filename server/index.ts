@@ -25,6 +25,7 @@ import {
   listProjects,
   listSubjects,
   pauseQueuedTasks,
+  resetPromptSettings,
   resumePausedTasks,
   saveAudit,
   updatePage,
@@ -418,11 +419,39 @@ app.get("/api/v1/settings", async () => ({
 
 app.patch("/api/v1/settings", async (request, reply) => {
   const updates = (request.body || {}) as Partial<AppSettings>;
+  const current = getSettings();
   if (updates.kimiRegion && !["cn", "global"].includes(updates.kimiRegion)) {
     return reply.code(400).send({ success: false, error: "请选择正确的 Kimi API 区域" });
   }
   if (updates.model && !["kimi-k2.6", "kimi-k3"].includes(updates.model)) {
     return reply.code(400).send({ success: false, error: "当前版本只支持 kimi-k2.6 或 kimi-k3" });
+  }
+  const sciencePageCount = updates.sciencePageCount ?? current.sciencePageCount;
+  const storyPageCount = updates.storyPageCount ?? current.storyPageCount;
+  const knowledgeMin =
+    updates.scienceKnowledgePointCountMin ?? current.scienceKnowledgePointCountMin;
+  const knowledgeMax =
+    updates.scienceKnowledgePointCountMax ?? current.scienceKnowledgePointCountMax;
+  const dailyLimit = updates.dailyAiCallLimit ?? current.dailyAiCallLimit;
+  if (!Number.isInteger(sciencePageCount) || sciencePageCount < 4 || sciencePageCount > 16) {
+    return reply.code(400).send({ success: false, error: "科普页数必须是 4 到 16 的整数" });
+  }
+  if (!Number.isInteger(storyPageCount) || storyPageCount < 4 || storyPageCount > 20) {
+    return reply.code(400).send({ success: false, error: "故事页数必须是 4 到 20 的整数" });
+  }
+  if (
+    !Number.isInteger(knowledgeMin) ||
+    !Number.isInteger(knowledgeMax) ||
+    knowledgeMin < 1 ||
+    knowledgeMax > 20 ||
+    knowledgeMin > knowledgeMax
+  ) {
+    return reply
+      .code(400)
+      .send({ success: false, error: "科普知识点范围必须是 1 到 20，且最少数量不能大于最多数量" });
+  }
+  if (!Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 200) {
+    return reply.code(400).send({ success: false, error: "每日调用上限必须是 1 到 200 的整数" });
   }
   return {
     success: true,
@@ -430,6 +459,12 @@ app.patch("/api/v1/settings", async (request, reply) => {
     services: serviceStatus(),
   };
 });
+
+app.post("/api/v1/settings/reset-prompts", async () => ({
+  success: true,
+  data: resetPromptSettings(),
+  services: serviceStatus(),
+}));
 
 app.post("/api/v1/settings/kimi-key", async (request, reply) => {
   const body = (request.body || {}) as {
@@ -508,6 +543,7 @@ app.get("/api/v1/exports/:id/download", async (request, reply) => {
           id: project.id,
           topic: project.topic,
           categories: project.categories,
+          consistencySettings: project.consistencySettings,
           exportedAt: new Date().toISOString(),
           audioProvider: "disabled",
           imageProvider: "local-placeholder-or-upload",

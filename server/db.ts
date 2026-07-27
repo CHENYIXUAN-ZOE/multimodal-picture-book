@@ -3,15 +3,26 @@ import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { paths } from "./config";
 import {
-  DEFAULT_IMAGE_STYLE,
+  DEFAULT_SCIENCE_IMAGE_PROMPT_GUIDE,
+  DEFAULT_SCIENCE_IMAGE_STYLE,
+  DEFAULT_SCIENCE_IMAGE_STYLE_PROMPT,
+  DEFAULT_SCIENCE_NEGATIVE_PROMPT,
   DEFAULT_SCIENCE_PROMPT,
+  DEFAULT_STORY_IMAGE_PROMPT_GUIDE,
+  DEFAULT_STORY_IMAGE_STYLE,
+  DEFAULT_STORY_IMAGE_STYLE_PROMPT,
+  DEFAULT_STORY_NEGATIVE_PROMPT,
   DEFAULT_STORY_PROMPT,
-} from "./prompts";
+  IMAGE_STYLE_PRESETS,
+  LEGACY_SCIENCE_PROMPT,
+  LEGACY_STORY_PROMPT,
+} from "./prompt-presets";
 import type {
   AppSettings,
   AuditIssue,
   AuditResult,
   BookPage,
+  ProjectConsistencySettings,
   Project,
   ProjectStatus,
   Subject,
@@ -52,6 +63,7 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'idle',
     current_step TEXT NOT NULL DEFAULT '等待开始',
     last_error TEXT,
+    consistency_settings_json TEXT NOT NULL DEFAULT '{"science":null,"story":null}',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE SET NULL
@@ -66,6 +78,8 @@ db.exec(`
     title TEXT NOT NULL DEFAULT '',
     text TEXT NOT NULL DEFAULT '',
     image_prompt TEXT NOT NULL DEFAULT '',
+    characters_in_scene_json TEXT NOT NULL DEFAULT '[]',
+    emotion TEXT NOT NULL DEFAULT '',
     image_path TEXT,
     audio_path TEXT,
     status TEXT NOT NULL DEFAULT 'pending',
@@ -116,11 +130,37 @@ db.exec(`
 
 const now = () => new Date().toISOString();
 
+function ensureColumn(table: string, column: string, definition: string) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!columns.some((item) => item.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+ensureColumn(
+  "projects",
+  "consistency_settings_json",
+  `TEXT NOT NULL DEFAULT '{"science":null,"story":null}'`,
+);
+ensureColumn("pages", "characters_in_scene_json", `TEXT NOT NULL DEFAULT '[]'`);
+ensureColumn("pages", "emotion", `TEXT NOT NULL DEFAULT ''`);
+
 const defaults: AppSettings = {
   targetAge: "6—9 岁",
   sciencePageCount: 7,
   storyPageCount: 8,
-  imageStyle: DEFAULT_IMAGE_STYLE,
+  scienceKnowledgePointCountMin: 6,
+  scienceKnowledgePointCountMax: 9,
+  scienceImageStyle: DEFAULT_SCIENCE_IMAGE_STYLE,
+  storyImageStyle: DEFAULT_STORY_IMAGE_STYLE,
+  imageStyle: DEFAULT_SCIENCE_IMAGE_STYLE_PROMPT,
+  scienceImageStylePrompt: DEFAULT_SCIENCE_IMAGE_STYLE_PROMPT,
+  scienceNegativePrompt: DEFAULT_SCIENCE_NEGATIVE_PROMPT,
+  scienceImagePromptGuide: DEFAULT_SCIENCE_IMAGE_PROMPT_GUIDE,
+  storyImageStylePrompt: DEFAULT_STORY_IMAGE_STYLE_PROMPT,
+  storyNegativePrompt: DEFAULT_STORY_NEGATIVE_PROMPT,
+  storyImagePromptGuide: DEFAULT_STORY_IMAGE_PROMPT_GUIDE,
+  imageStylePresets: IMAGE_STYLE_PRESETS,
   model: "kimi-k2.6",
   kimiEnabled: false,
   kimiRegion: "cn",
@@ -138,6 +178,25 @@ const upsertSetting = db.prepare(`
 for (const [key, value] of Object.entries(defaults)) {
   upsertSetting.run(key, JSON.stringify(value), now());
 }
+
+function upgradeLegacyPromptDefaults() {
+  const statement = db.prepare(
+    "SELECT value_json FROM settings WHERE key = ?",
+  );
+  const update = db.prepare(
+    "UPDATE settings SET value_json = ?, updated_at = ? WHERE key = ?",
+  );
+  const science = statement.get("sciencePrompt") as { value_json: string } | undefined;
+  const story = statement.get("storyPrompt") as { value_json: string } | undefined;
+  if (science && JSON.parse(science.value_json) === LEGACY_SCIENCE_PROMPT) {
+    update.run(JSON.stringify(DEFAULT_SCIENCE_PROMPT), now(), "sciencePrompt");
+  }
+  if (story && JSON.parse(story.value_json) === LEGACY_STORY_PROMPT) {
+    update.run(JSON.stringify(DEFAULT_STORY_PROMPT), now(), "storyPrompt");
+  }
+}
+
+upgradeLegacyPromptDefaults();
 
 type SubjectSeed = {
   level1: string;
@@ -212,6 +271,8 @@ const asPage = (row: Record<string, unknown>): BookPage => ({
   title: String(row.title),
   text: String(row.text),
   imagePrompt: String(row.image_prompt),
+  charactersInScene: JSON.parse(String(row.characters_in_scene_json || "[]")),
+  emotion: String(row.emotion || ""),
   imageUrl: row.image_path ? `/api/local/storage/${String(row.image_path)}` : null,
   audioUrl: row.audio_path ? `/api/local/storage/${String(row.audio_path)}` : null,
   status: String(row.status) as BookPage["status"],
@@ -228,6 +289,9 @@ const asProject = (row: Record<string, unknown>): Project => ({
   lastError: row.last_error ? String(row.last_error) : null,
   createdAt: String(row.created_at),
   updatedAt: String(row.updated_at),
+  consistencySettings: JSON.parse(
+    String(row.consistency_settings_json || '{"science":null,"story":null}'),
+  ) as ProjectConsistencySettings,
 });
 
 export function getSettings(): AppSettings {
@@ -252,6 +316,25 @@ export function updateSettings(updates: Partial<AppSettings>) {
     if (allowed.has(key) && value !== undefined) statement.run(key, JSON.stringify(value), now());
   }
   return getSettings();
+}
+
+export function resetPromptSettings() {
+  return updateSettings({
+    scienceKnowledgePointCountMin: defaults.scienceKnowledgePointCountMin,
+    scienceKnowledgePointCountMax: defaults.scienceKnowledgePointCountMax,
+    scienceImageStyle: defaults.scienceImageStyle,
+    storyImageStyle: defaults.storyImageStyle,
+    imageStyle: defaults.imageStyle,
+    scienceImageStylePrompt: defaults.scienceImageStylePrompt,
+    scienceNegativePrompt: defaults.scienceNegativePrompt,
+    scienceImagePromptGuide: defaults.scienceImagePromptGuide,
+    storyImageStylePrompt: defaults.storyImageStylePrompt,
+    storyNegativePrompt: defaults.storyNegativePrompt,
+    storyImagePromptGuide: defaults.storyImagePromptGuide,
+    imageStylePresets: defaults.imageStylePresets,
+    sciencePrompt: defaults.sciencePrompt,
+    storyPrompt: defaults.storyPrompt,
+  });
 }
 
 export function listSubjects(input: {
@@ -468,19 +551,39 @@ export function deleteProject(id: string) {
 export function replacePages(
   projectId: string,
   content: {
-    science: Array<{ title: string; text: string; imagePrompt: string }>;
-    story: Array<{ title: string; text: string; imagePrompt: string }>;
+    consistencySettings?: ProjectConsistencySettings;
+    science: Array<{
+      title: string;
+      text: string;
+      imagePrompt: string;
+      charactersInScene?: string[];
+      emotion?: string;
+    }>;
+    story: Array<{
+      title: string;
+      text: string;
+      imagePrompt: string;
+      charactersInScene?: string[];
+      emotion?: string;
+    }>;
   },
 ) {
   db.prepare("DELETE FROM pages WHERE project_id = ?").run(projectId);
   const insert = db.prepare(`
     INSERT INTO pages (
       id, project_id, content_type, page_index, title, text,
-      image_prompt, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'placeholder', ?, ?)
+      image_prompt, characters_in_scene_json, emotion, status, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'placeholder', ?, ?)
   `);
   db.exec("BEGIN");
   try {
+    db.prepare(
+      "UPDATE projects SET consistency_settings_json = ?, updated_at = ? WHERE id = ?",
+    ).run(
+      JSON.stringify(content.consistencySettings || { science: null, story: null }),
+      now(),
+      projectId,
+    );
     (["science", "story"] as const).forEach((contentType) => {
       content[contentType].forEach((page, index) => {
         const timestamp = now();
@@ -492,6 +595,8 @@ export function replacePages(
           page.title,
           page.text,
           page.imagePrompt,
+          JSON.stringify(page.charactersInScene || []),
+          page.emotion || "",
           timestamp,
           timestamp,
         );

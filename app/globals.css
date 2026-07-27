@@ -1666,6 +1666,11 @@ textarea:focus-visible {
   font-size: 9px;
 }
 
+.settings-title-action {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .settings-icon,
 .provider-icon,
 .mode-icon {
@@ -1781,6 +1786,148 @@ select.text-input {
   min-height: 210px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 10px;
+}
+
+.prompt-guide-area {
+  min-height: 250px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.compact-prompt-area {
+  min-height: 76px;
+}
+
+.style-preset-list,
+.story-style-actions,
+.prompt-tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.style-preset-list {
+  margin-bottom: 14px;
+}
+
+.style-preset-chip,
+.story-style-actions button,
+.prompt-tab-list button {
+  border: 1px solid #ddd5df;
+  background: #fff;
+  color: #5a5069;
+  cursor: pointer;
+  transition: 150ms ease;
+}
+
+.style-preset-chip {
+  display: grid;
+  gap: 2px;
+  padding: 8px 11px;
+  border-radius: 12px;
+  font-size: 9px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.style-preset-chip span {
+  color: var(--muted);
+  font-size: 7px;
+  font-weight: 600;
+}
+
+.style-preset-chip:hover,
+.story-style-actions button:hover,
+.prompt-tab-list button:hover {
+  border-color: #b7a7e6;
+  background: #faf8ff;
+}
+
+.image-config-grid {
+  margin-bottom: 14px;
+}
+
+.prompt-config-panel,
+.prompt-workbench-panel {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.science-config-panel {
+  background: #f8fcfa;
+}
+
+.story-config-panel {
+  background: #fcf9ff;
+}
+
+.prompt-config-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 10px;
+}
+
+.prompt-config-heading span {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.prompt-config-panel .field-label + .field-label {
+  margin-top: 11px;
+}
+
+.story-style-actions {
+  margin-bottom: 11px;
+}
+
+.story-style-actions button {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.story-style-actions button.is-active,
+.prompt-tab-list button.is-active {
+  border-color: #a997df;
+  color: #5d47a5;
+  background: #f1ecff;
+}
+
+.prompt-tab-list {
+  margin-bottom: 13px;
+  padding: 4px;
+  border-radius: 13px;
+  background: #f5f1f7;
+}
+
+.prompt-tab-list button {
+  flex: 1 1 180px;
+  min-height: 38px;
+  border-color: transparent;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.prompt-workbench-panel {
+  display: grid;
+  gap: 13px;
+  background: #fdfbf7;
+}
+
+.prompt-count-row {
+  max-width: 420px;
+}
+
+.field-help {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 500;
 }
 
 .text-input:focus,
@@ -2283,6 +2430,40 @@ select.text-input {
   font-size: 10px;
 }
 
+.consistency-strip {
+  display: grid;
+  width: min(1200px, calc(100% - 48px));
+  grid-template-columns: 1.4fr 0.8fr 0.8fr;
+  gap: 10px;
+  margin: 0 auto 2px;
+}
+
+.consistency-strip > div {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #e6dfec;
+  border-radius: 12px;
+  background: #faf8ff;
+}
+
+.consistency-strip span,
+.consistency-strip strong {
+  display: block;
+}
+
+.consistency-strip span {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.consistency-strip strong {
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .page-grid {
   display: grid;
   width: min(1200px, 100%);
@@ -2357,6 +2538,22 @@ select.text-input {
   line-height: 1.6;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
+}
+
+.page-context-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.page-context-chips span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: #65538e;
+  background: #f3effc;
+  font-size: 7px;
+  font-weight: 700;
 }
 
 .page-footer {
@@ -2613,6 +2810,11 @@ select.text-input {
     padding: 20px 18px 38px;
   }
 
+  .consistency-strip {
+    width: calc(100% - 36px);
+    grid-template-columns: 1fr;
+  }
+
   .hero-panel {
     grid-template-columns: 1fr;
   }
@@ -2702,6 +2904,15 @@ select.text-input {
 }
 
 @media (max-width: 590px) {
+  .settings-card-title {
+    flex-wrap: wrap;
+  }
+
+  .settings-title-action {
+    width: 100%;
+    margin-left: 0;
+  }
+
   .topbar-actions .primary-button {
     width: 42px;
     padding: 0;

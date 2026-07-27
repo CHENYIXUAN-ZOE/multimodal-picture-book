@@ -10,12 +10,13 @@ import {
 } from "./db";
 import { generateWithKimi } from "./kimi";
 import { createPlaceholder } from "./placeholder";
+import type { AppSettings } from "../shared/types";
 
 let queuePaused = false;
 let processing = false;
 let activeProjectId: string | null = null;
 
-function localBook(topic: string, scienceCount: number, storyCount: number) {
+function localBook(topic: string, settings: AppSettings) {
   const scienceAngles = [
     ["初次见面", `先来认识${topic}。它最容易被观察到的特征是什么？仔细看一看，你也许会发现一个过去忽略的小细节。`],
     ["住在哪里", `${topic}并不是随处都以同样的方式出现。环境中的温度、水分、光线和空间，会影响它的样子与生活方式。`],
@@ -47,12 +48,38 @@ function localBook(topic: string, scienceCount: number, storyCount: number) {
       return {
         title,
         text,
-        imagePrompt: `${topic}, ${title}, ${contentType === "science" ? "educational visual explanation" : "children's story scene"}, expressive composition, playful children's editorial illustration, soft clay texture, no text, vertical 2:3`,
+        imagePrompt: `${topic}, ${title}, ${contentType === "science" ? "educational visual explanation" : "children's story scene"}, expressive composition, ${contentType === "science" ? settings.scienceImageStylePrompt : settings.storyImageStylePrompt}, no text, full bleed, vertical 2:3`,
+        charactersInScene: contentType === "story" ? ["主角"] : [],
+        emotion: contentType === "science" ? "好奇" : "温暖",
       };
     });
   return {
-    science: makePages(scienceAngles, scienceCount, "science"),
-    story: makePages(storyBeats, storyCount, "story"),
+    consistencySettings: {
+      science: {
+        type: "concept" as const,
+        coreSubjects: [],
+        artStyle: settings.scienceImageStylePrompt,
+        colorPalette: "bright, balanced educational palette",
+      },
+      story: {
+        type: "character_story" as const,
+        narrativeReason: "本地演示模板",
+        coreSubjects: [
+          {
+            name: "主角",
+            headFeatures: "圆润、友善、表情清晰",
+            bodyType: "适合儿童绘本的简洁比例",
+            otherFeatures: `围绕${topic}设计的稳定标志性特征`,
+            personality: "好奇、主动",
+          },
+        ],
+        artStyle: settings.storyImageStylePrompt,
+        colorPalette: "warm, gentle storybook palette",
+        storyTheme: "好奇与探索",
+      },
+    },
+    science: makePages(scienceAngles, settings.sciencePageCount, "science"),
+    story: makePages(storyBeats, settings.storyPageCount, "story"),
   };
 }
 
@@ -81,7 +108,7 @@ async function processTask() {
             categories: project.categories,
             acknowledgeCost: task.cost_acknowledged === 1,
           })
-        : localBook(project.topic, settings.sciencePageCount, settings.storyPageCount);
+        : localBook(project.topic, settings);
 
     updateTask(task.id, "processing", 35, "文案完成，正在准备页面");
     replacePages(project.id, book);

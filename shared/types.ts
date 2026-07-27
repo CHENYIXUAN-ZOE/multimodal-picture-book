@@ -39,9 +39,33 @@ export interface BookPage {
   title: string;
   text: string;
   imagePrompt: string;
+  charactersInScene: string[];
+  emotion: string;
   imageUrl?: string | null;
   audioUrl?: string | null;
   status: PageStatus;
+}
+
+export interface CoreSubject {
+  name: string;
+  headFeatures: string;
+  bodyType: string;
+  otherFeatures: string;
+  personality?: string;
+}
+
+export interface ConsistencySettings {
+  type: "character_story" | "lifecycle" | "concept" | "comparison";
+  narrativeReason?: string;
+  coreSubjects: CoreSubject[];
+  artStyle: string;
+  colorPalette: string;
+  storyTheme?: string;
+}
+
+export interface ProjectConsistencySettings {
+  science: ConsistencySettings | null;
+  story: ConsistencySettings | null;
 }
 
 export interface AuditIssue {
@@ -73,6 +97,7 @@ export interface Project {
   lastError?: string | null;
   createdAt: string;
   updatedAt: string;
+  consistencySettings: ProjectConsistencySettings;
   pages?: BookPage[];
   audit?: AuditResult | null;
 }
@@ -96,7 +121,18 @@ export interface AppSettings {
   targetAge: string;
   sciencePageCount: number;
   storyPageCount: number;
+  scienceKnowledgePointCountMin: number;
+  scienceKnowledgePointCountMax: number;
+  scienceImageStyle: string;
+  storyImageStyle: string;
   imageStyle: string;
+  scienceImageStylePrompt: string;
+  scienceNegativePrompt: string;
+  scienceImagePromptGuide: string;
+  storyImageStylePrompt: string;
+  storyNegativePrompt: string;
+  storyImagePromptGuide: string;
+  imageStylePresets: ImageStylePreset[];
   model: string;
   kimiEnabled: boolean;
   kimiRegion: "cn" | "global";
@@ -104,6 +140,12 @@ export interface AppSettings {
   dailyAiCallLimit: number;
   sciencePrompt: string;
   storyPrompt: string;
+}
+
+export interface ImageStylePreset {
+  name: string;
+  stylePrompt: string;
+  negativePrompt: string;
 }
 
 export interface KimiConnectionResult {

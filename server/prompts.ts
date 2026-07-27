@@ -1,25 +1,7 @@
-export const DEFAULT_SCIENCE_PROMPT = `你是一位专业的儿童科普绘本作者。请围绕主题创作适合 {age} 儿童的科普绘本。
-
-要求：
-1. 每页只讲一个清晰、准确、可验证的知识点。
-2. 同时覆盖“是什么、为什么、和孩子有什么关系”三个层次。
-3. 用第二人称和自然提问增加互动感，不使用方括号标签。
-4. 语言温暖、简短、有画面感，但不能为了趣味牺牲科学准确性。
-5. 每页给出一个从正文知识点推导出的英文图片提示词；提示词要描述主体、动作、场景、构图和光线。
-6. 最后一页进行总结或留下值得继续探索的问题。`;
-
-export const DEFAULT_STORY_PROMPT = `你是一位儿童故事绘本创作者。请围绕主题创作适合 {age} 儿童的完整故事。
-
-要求：
-1. 从主题的真实特点出发，先确定核心情感或价值，再设计故事。
-2. 包含明确的开端、变化、挑战、解决与温暖结尾。
-3. 每页推动情节，避免重复动作和空泛说教。
-4. 角色外观、性格和关系前后一致。
-5. 每页给出一个英文图片提示词，明确角色动作、表情、镜头和环境。
-6. 文字适合亲子朗读，保留想象空间。`;
-
-export const DEFAULT_IMAGE_STYLE =
-  "playful children's editorial illustration, soft clay texture, lively gestures, warm daylight, rounded shapes, rich but gentle colors, vertical 2:3 composition, no text, no border";
+export {
+  DEFAULT_SCIENCE_PROMPT,
+  DEFAULT_STORY_PROMPT,
+} from "./prompt-presets";
 
 export function buildBookPrompt(input: {
   topic: string;
@@ -27,45 +9,131 @@ export function buildBookPrompt(input: {
   targetAge: string;
   sciencePageCount: number;
   storyPageCount: number;
+  scienceKnowledgePointCountMin: number;
+  scienceKnowledgePointCountMax: number;
   sciencePrompt: string;
   storyPrompt: string;
-  imageStyle: string;
+  scienceImageStylePrompt: string;
+  scienceNegativePrompt: string;
+  scienceImagePromptGuide: string;
+  storyImageStylePrompt: string;
+  storyNegativePrompt: string;
+  storyImagePromptGuide: string;
 }) {
-  return `请为“${input.topic}”生成一套科普绘本与故事绘本。
+  return `请为“${input.topic}”生成一套相互独立的科普绘本与故事绘本。
 分类：${input.categories.join(" > ") || "未分类"}
 目标年龄：${input.targetAge}
 
-科普创作规则：
+【科普绘本系统规则】
 ${input.sciencePrompt.replaceAll("{age}", input.targetAge)}
 
-故事创作规则：
+科普绘本必须生成 ${input.sciencePageCount} 页，并覆盖 ${input.scienceKnowledgePointCountMin} 到 ${input.scienceKnowledgePointCountMax} 个关键知识点。
+
+【科普图片描述指导】
+${input.scienceImagePromptGuide}
+
+【科普图片默认风格】
+${input.scienceImageStylePrompt}
+
+【科普图片禁止项】
+${input.scienceNegativePrompt}
+
+【故事绘本系统规则】
 ${input.storyPrompt.replaceAll("{age}", input.targetAge)}
 
-统一图片风格：
-${input.imageStyle}
+故事绘本必须生成 ${input.storyPageCount} 页。
+
+【故事图片描述指导】
+${input.storyImagePromptGuide}
+
+【故事图片默认风格】
+${input.storyImageStylePrompt}
+
+【故事图片禁止项】
+${input.storyNegativePrompt}
+
+【生成前内部规划】
+1. 科普部分先判断主题类型：character_story、lifecycle、concept 或 comparison。
+2. 科普部分规划知识维度、核心主体外观和统一色彩。
+3. 故事部分先确定立意、叙事策略、角色性格和统一视觉设定。
+4. 再逐页写正文和英文 imagePrompt。不要把内部推理写到 JSON 之外。
 
 请严格返回 JSON 对象，不要添加 Markdown。结构如下：
 {
   "science": {
     "title": "书名",
+    "consistencySettings": {
+      "type": "character_story|lifecycle|concept|comparison",
+      "coreSubjects": [
+        {
+          "name": "主体名称",
+          "headFeatures": "头部、面部或最醒目的识别特征",
+          "bodyType": "体型、结构和比例",
+          "otherFeatures": "颜色、服装、材质或其他标志性特征"
+        }
+      ],
+      "artStyle": "英文艺术风格",
+      "colorPalette": "英文统一色彩方案"
+    },
     "pages": [
-      {"title":"页标题","text":"正文","imagePrompt":"英文图片提示词"}
+      {
+        "title": "页标题",
+        "text": "正文",
+        "imagePrompt": "从本页知识点推导出的英文图片提示词",
+        "charactersInScene": ["本页实际出现的主体名称"],
+        "emotion": "本页氛围"
+      }
     ]
   },
   "story": {
     "title": "书名",
+    "consistencySettings": {
+      "type": "character_story",
+      "narrativeReason": "选择该叙事策略的原因",
+      "coreSubjects": [
+        {
+          "name": "角色名称",
+          "headFeatures": "稳定的头部和面部特征",
+          "bodyType": "稳定的体型与比例",
+          "otherFeatures": "稳定的颜色、服装和标志性特征",
+          "personality": "角色性格"
+        }
+      ],
+      "artStyle": "英文艺术风格",
+      "colorPalette": "英文统一色彩方案",
+      "storyTheme": "故事立意或核心情感"
+    },
     "pages": [
-      {"title":"页标题","text":"正文","imagePrompt":"英文图片提示词"}
+      {
+        "title": "页标题",
+        "text": "正文",
+        "imagePrompt": "按表情、动作、镜头、场景、光线五要素组织的英文图片提示词",
+        "charactersInScene": ["本页实际出现的角色名称"],
+        "emotion": "准确的页面情绪"
+      }
     ]
   }
 }
 
-science.pages 必须恰好 ${input.sciencePageCount} 页，story.pages 必须恰好 ${input.storyPageCount} 页。`;
+【JSON 强制要求】
+- science.pages 必须恰好 ${input.sciencePageCount} 页
+- story.pages 必须恰好 ${input.storyPageCount} 页
+- 所有页面必须包含 title、text、imagePrompt、charactersInScene、emotion
+- charactersInScene 只填写当前画面真正出现的主体；没有角色时返回空数组
+- 相同角色在不同页面的名称必须完全一致
+- imagePrompt 必须使用英文，不包含绘图参数语法或 Markdown
+- imagePrompt 的场景、动作和情绪必须与本页 text 一致
+- 不输出额外字段，不输出 JSON 之外的解释。`;
 }
 
 export function buildAuditPrompt(project: {
   topic: string;
-  pages: Array<{ contentType: string; pageIndex: number; text: string; imagePrompt: string }>;
+  pages: Array<{
+    contentType: string;
+    pageIndex: number;
+    text: string;
+    imagePrompt: string;
+  }>;
 }) {
   return `请审核儿童绘本“${project.topic}”。重点检查科学准确性、年龄适配、安全性、故事连续性、图片提示词与正文的一致性。
 
