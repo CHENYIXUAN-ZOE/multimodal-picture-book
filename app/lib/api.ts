@@ -1,4 +1,7 @@
+import { demoApi } from "./demo-api";
+
 const API_BASE = "/api/local/api/v1";
+export const isPublicDemo = process.env.NEXT_PUBLIC_DEPLOYMENT_MODE === "demo";
 
 export class ApiError extends Error {
   status: number;
@@ -13,6 +16,9 @@ export async function api<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  if (isPublicDemo) {
+    return demoApi<T>(path, options);
+  }
   const headers = new Headers(options.headers);
   if (!(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");

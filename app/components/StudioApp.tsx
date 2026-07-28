@@ -52,7 +52,7 @@ import type {
   ServiceStatus,
   Subject,
 } from "@/shared/types";
-import { api, downloadUrl, jsonBody } from "../lib/api";
+import { api, downloadUrl, isPublicDemo, jsonBody } from "../lib/api";
 
 type View =
   | "dashboard"
@@ -71,9 +71,19 @@ const navItems: Array<{
   icon: typeof LayoutDashboard;
 }> = [
   { id: "dashboard", label: "创作首页", hint: "今天做什么", icon: LayoutDashboard },
-  { id: "subjects", label: "灵感主体库", hint: "12,691 个主题", icon: LibraryBig },
+  {
+    id: "subjects",
+    label: "灵感主体库",
+    hint: isPublicDemo ? "精选演示主题" : "12,691 个主题",
+    icon: LibraryBig,
+  },
   { id: "projects", label: "绘本工坊", hint: "科普与故事", icon: FolderKanban },
-  { id: "progress", label: "生成进度", hint: "单机安全队列", icon: Gauge },
+  {
+    id: "progress",
+    label: "生成进度",
+    hint: isPublicDemo ? "演示安全队列" : "单机安全队列",
+    icon: Gauge,
+  },
   { id: "audit", label: "内容审核", hint: "质量与安全", icon: ShieldCheck },
   { id: "settings", label: "创作设置", hint: "模型与提示词", icon: Settings },
 ];
@@ -434,6 +444,15 @@ export function StudioApp() {
 
   return (
     <div className="studio-shell">
+      {isPublicDemo ? (
+        <div className="public-demo-banner" role="status">
+          <ShieldCheck size={16} />
+          <span>
+            <strong>安全公开演示版</strong>
+            数据仅保存在当前浏览器，不连接 Kimi、不上传文件，也不会产生 API 费用。
+          </span>
+        </div>
+      ) : null}
       <aside className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}>
         <div className="brand">
           <div className="brand-mark" aria-hidden="true">
@@ -477,8 +496,8 @@ export function StudioApp() {
               <ShieldCheck size={20} />
             </div>
             <div>
-              <strong>单机安全模式</strong>
-              <span>数据只住在这台电脑</span>
+              <strong>{isPublicDemo ? "公开演示模式" : "单机安全模式"}</strong>
+              <span>{isPublicDemo ? "数据只存在当前浏览器" : "数据只住在这台电脑"}</span>
             </div>
             <span className="live-dot" />
           </div>
@@ -510,7 +529,9 @@ export function StudioApp() {
               <div>
                 <strong>{services?.kimi.enabled ? "Kimi 已启用" : "Kimi 安全关闭"}</strong>
                 <small>
-                  {services?.kimi.callsToday || 0}/{services?.kimi.dailyLimit || 20} 次今日调用
+                  {isPublicDemo
+                    ? "在线调用已完全禁用"
+                    : `${services?.kimi.callsToday || 0}/${services?.kimi.dailyLimit || 20} 次今日调用`}
                 </small>
               </div>
             </div>
@@ -906,7 +927,9 @@ function DashboardView({
             变成孩子爱读的两本书。
           </h2>
           <p>
-            一次创作，同时得到科普绘本与故事绘本。默认使用本地模式，不触发任何付费 API。
+            {isPublicDemo
+              ? "在线安全体验科普与故事绘本工作流；演示版不会连接任何付费 API。"
+              : "一次创作，同时得到科普绘本与故事绘本。默认使用本地模式，不触发任何付费 API。"}
           </p>
           <div className="hero-actions">
             <button className="primary-button primary-large" onClick={onCreate}>
@@ -915,7 +938,7 @@ function DashboardView({
             </button>
             <span className="safe-caption">
               <ShieldCheck size={16} />
-              SQLite 本地存储
+              {isPublicDemo ? "浏览器演示数据" : "SQLite 本地存储"}
             </span>
           </div>
         </div>
@@ -1028,8 +1051,8 @@ function DashboardView({
                 <BadgeCheck size={19} />
               </span>
               <div>
-                <strong>本地数据</strong>
-                <span>SQLite 与素材都在本机</span>
+                <strong>{isPublicDemo ? "演示数据" : "本地数据"}</strong>
+                <span>{isPublicDemo ? "仅保存在当前浏览器" : "SQLite 与素材都在本机"}</span>
               </div>
               <span className="service-state ready">已就绪</span>
             </div>
@@ -1053,7 +1076,7 @@ function DashboardView({
               </span>
               <div>
                 <strong>图片位置</strong>
-                <span>本地占位图 · 支持上传</span>
+                <span>{isPublicDemo ? "示例内容 · 禁止上传" : "本地占位图 · 支持上传"}</span>
               </div>
               <span className="service-state ready">零费用</span>
             </div>
