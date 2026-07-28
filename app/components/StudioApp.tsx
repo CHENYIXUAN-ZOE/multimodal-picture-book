@@ -1603,7 +1603,11 @@ function SettingsView({
         <div>
           <span className="section-kicker">CREATION SETTINGS</span>
           <h2>把风格、成本和安全边界，都握在自己手里。</h2>
-          <p>密钥只在填写时短暂经过页面，验证后由本机服务端单独保管。</p>
+          <p>
+            {isPublicDemo
+              ? "公开演示版不接收任何 API Key；提示词与风格调整仅保存在当前浏览器。"
+              : "密钥只在填写时短暂经过页面，验证后由本机服务端单独保管。"}
+          </p>
         </div>
         <button
           className="primary-button"
@@ -1627,6 +1631,16 @@ function SettingsView({
             </div>
           </div>
           <div className="kimi-key-panel">
+            {isPublicDemo ? (
+              <div className="security-note">
+                <ShieldCheck size={18} />
+                <div>
+                  <strong>公开版禁止填写 API Key</strong>
+                  <span>如需真实生成，请在你自己的本地完整版中配置，避免公开额度被他人使用。</span>
+                </div>
+              </div>
+            ) : (
+              <>
             <label className="field-label">
               Kimi API Key
               <div className="secret-input-wrap">
@@ -1715,6 +1729,8 @@ function SettingsView({
             <p className="key-storage-caption">
               验证通过后仅写入本机受限文件，不进入 SQLite、浏览器存储、日志、导出包或 Git。
             </p>
+              </>
+            )}
           </div>
           <div className="settings-status-grid">
             <div>
@@ -2358,17 +2374,29 @@ function Workbench({
                 <ShieldCheck size={16} />
                 <span>本地审核</span>
               </button>
-              <a
-                aria-label="导出资源包"
-                className="primary-button"
-                href={downloadUrl(`/exports/${project.id}/download`)}
-                target="_blank"
-                rel="noreferrer"
-                title="导出资源包"
-              >
-                <Download size={16} />
-                <span>导出资源包</span>
-              </a>
+              {isPublicDemo ? (
+                <button
+                  aria-label="公开演示版不可导出"
+                  className="primary-button"
+                  disabled
+                  title="公开演示版不可导出"
+                >
+                  <Download size={16} />
+                  <span>演示版不可导出</span>
+                </button>
+              ) : (
+                <a
+                  aria-label="导出资源包"
+                  className="primary-button"
+                  href={downloadUrl(`/exports/${project.id}/download`)}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="导出资源包"
+                >
+                  <Download size={16} />
+                  <span>导出资源包</span>
+                </a>
+              )}
             </>
           ) : (
             <button

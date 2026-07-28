@@ -1,6 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
+  metadataBase: new URL("https://zoechen-multimodal-picture-book.netlify.app"),
   title: "多模态绘本｜把知识变成会发光的故事",
   description:
     "本地优先、安全可控的儿童科普与故事绘本创作工作台。",
