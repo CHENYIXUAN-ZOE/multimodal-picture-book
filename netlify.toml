@@ -4,7 +4,10 @@
 
 [build.environment]
   NODE_VERSION = "22"
-  NEXT_PUBLIC_DEPLOYMENT_MODE = "demo"
+  NEXT_PUBLIC_DEPLOYMENT_MODE = "private-demo"
+
+[functions]
+  directory = "netlify/functions"
 
 [[headers]]
   for = "/*"

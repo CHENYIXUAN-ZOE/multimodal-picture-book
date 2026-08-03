@@ -23,6 +23,7 @@ import {
   KeyRound,
   LayoutDashboard,
   LibraryBig,
+  LogOut,
   Menu,
   Palette,
   Pause,
@@ -52,7 +53,7 @@ import type {
   ServiceStatus,
   Subject,
 } from "@/shared/types";
-import { api, downloadUrl, isPublicDemo, jsonBody } from "../lib/api";
+import { api, downloadUrl, isPrivateDemo, isPublicDemo, jsonBody } from "../lib/api";
 
 type View =
   | "dashboard"
@@ -448,8 +449,10 @@ export function StudioApp() {
         <div className="public-demo-banner" role="status">
           <ShieldCheck size={16} />
           <span>
-            <strong>安全公开演示版</strong>
-            数据仅保存在当前浏览器，不连接 Kimi、不上传文件，也不会产生 API 费用。
+            <strong>{isPrivateDemo ? "Kimi 私人演示版" : "安全公开演示版"}</strong>
+            {isPrivateDemo
+              ? "已通过密码保护；Kimi 调用需逐次确认，项目数据仅保存在当前浏览器。"
+              : "数据仅保存在当前浏览器，不连接 Kimi、不上传文件，也不会产生 API 费用。"}
           </span>
         </div>
       ) : null}
@@ -530,7 +533,9 @@ export function StudioApp() {
                 <strong>{services?.kimi.enabled ? "Kimi 已启用" : "Kimi 安全关闭"}</strong>
                 <small>
                   {isPublicDemo
-                    ? "在线调用已完全禁用"
+                    ? isPrivateDemo
+                      ? `${services?.kimi.callsToday || 0}/${services?.kimi.dailyLimit || 12} 次今日上限`
+                      : "在线调用已完全禁用"
                     : `${services?.kimi.callsToday || 0}/${services?.kimi.dailyLimit || 20} 次今日调用`}
                 </small>
               </div>
@@ -539,6 +544,19 @@ export function StudioApp() {
               <Plus size={18} />
               新建绘本
             </button>
+            {isPrivateDemo ? (
+              <button
+                className="icon-button"
+                aria-label="退出私人演示站"
+                title="退出私人演示站"
+                onClick={async () => {
+                  await fetch("/api/auth/logout", { method: "POST" });
+                  window.location.assign("/login");
+                }}
+              >
+                <LogOut size={18} />
+              </button>
+            ) : null}
           </div>
         </header>
 
@@ -1605,7 +1623,9 @@ function SettingsView({
           <h2>把风格、成本和安全边界，都握在自己手里。</h2>
           <p>
             {isPublicDemo
-              ? "公开演示版不接收任何 API Key；提示词与风格调整仅保存在当前浏览器。"
+              ? isPrivateDemo
+                ? "Kimi Key 由 Netlify 服务端 Secret 保管；页面无法读取，提示词调整仅保存在当前浏览器。"
+                : "公开演示版不接收任何 API Key；提示词与风格调整仅保存在当前浏览器。"
               : "密钥只在填写时短暂经过页面，验证后由本机服务端单独保管。"}
           </p>
         </div>
@@ -1635,8 +1655,12 @@ function SettingsView({
               <div className="security-note">
                 <ShieldCheck size={18} />
                 <div>
-                  <strong>公开版禁止填写 API Key</strong>
-                  <span>如需真实生成，请在你自己的本地完整版中配置，避免公开额度被他人使用。</span>
+                  <strong>{isPrivateDemo ? "API Key 只存在 Netlify 服务端" : "公开版禁止填写 API Key"}</strong>
+                  <span>
+                    {isPrivateDemo
+                      ? "浏览器和 GitHub 都无法获取完整 Key；每次生成仍需确认费用。"
+                      : "如需真实生成，请在你自己的本地完整版中配置。"}
+                  </span>
                 </div>
               </div>
             ) : (

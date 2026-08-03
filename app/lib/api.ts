@@ -1,7 +1,10 @@
 import { demoApi } from "./demo-api";
 
 const API_BASE = "/api/local/api/v1";
-export const isPublicDemo = process.env.NEXT_PUBLIC_DEPLOYMENT_MODE === "demo";
+export const isPrivateDemo = process.env.NEXT_PUBLIC_DEPLOYMENT_MODE === "private-demo";
+export const isPublicDemo = ["demo", "private-demo"].includes(
+  process.env.NEXT_PUBLIC_DEPLOYMENT_MODE || "",
+);
 
 export class ApiError extends Error {
   status: number;

@@ -8,6 +8,7 @@ import type {
 
 const STORAGE_KEY = "multimodal-picture-book-public-demo-v1";
 const now = "2026-07-28T08:00:00.000Z";
+const privateDemo = process.env.NEXT_PUBLIC_DEPLOYMENT_MODE === "private-demo";
 
 const subjects: Subject[] = [
   {
@@ -199,13 +200,13 @@ const services: ServiceStatus = {
   localOnly: true,
   database: "ready",
   kimi: {
-    configured: false,
-    enabled: false,
+    configured: privateDemo,
+    enabled: privateDemo,
     keySource: null,
     keyHint: null,
     model: "kimi-k2.6",
     callsToday: 0,
-    dailyLimit: 0,
+    dailyLimit: privateDemo ? 12 : 0,
     endpointRegion: "cn",
   },
   image: {
@@ -227,7 +228,12 @@ function initialState(): DemoState {
   return {
     projects: [demoProject],
     subjects,
-    settings: defaultSettings,
+    settings: {
+      ...defaultSettings,
+      kimiEnabled: privateDemo,
+      generationMode: privateDemo ? "kimi" : "local",
+      dailyAiCallLimit: privateDemo ? 12 : 0,
+    },
     paused: false,
   };
 }
@@ -236,7 +242,15 @@ function loadState(): DemoState {
   if (typeof window === "undefined") return initialState();
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
-    return saved ? (JSON.parse(saved) as DemoState) : initialState();
+    const state = saved ? (JSON.parse(saved) as DemoState) : initialState();
+    if (privateDemo) {
+      state.settings = {
+        ...state.settings,
+        kimiEnabled: true,
+        dailyAiCallLimit: 12,
+      };
+    }
+    return state;
   } catch {
     return initialState();
   }
@@ -309,7 +323,12 @@ export async function demoApi<T>(path: string, options: RequestInit = {}): Promi
     return { success: true, data: state.settings, services } as T;
   }
   if (pathname === "/settings" && method === "PATCH") {
-    state.settings = { ...state.settings, ...payload, kimiEnabled: false, dailyAiCallLimit: 0 };
+    state.settings = {
+      ...state.settings,
+      ...payload,
+      kimiEnabled: privateDemo,
+      dailyAiCallLimit: privateDemo ? 12 : 0,
+    };
     saveState(state);
     return { success: true, data: state.settings, services } as T;
   }
@@ -391,7 +410,59 @@ export async function demoApi<T>(path: string, options: RequestInit = {}): Promi
       return { success: true } as T;
     }
     if (action === "generate") {
-      throw new Error("公开演示版已关闭真实 AI 生成，避免产生费用。请在本地完整版中使用。");
+      if (!privateDemo || payload.mode !== "kimi") {
+        throw new Error("在线演示版只支持经费用确认的 Kimi 生成。");
+      }
+      const response = await fetch("/api/demo/kimi-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: state.projects[index].topic,
+          categories: state.projects[index].categories,
+          acknowledgeCost: payload.acknowledgeCost === true,
+          settings: state.settings,
+        }),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        success?: boolean;
+        error?: string;
+        data?: {
+          consistencySettings: Project["consistencySettings"];
+          science: Array<Omit<NonNullable<Project["pages"]>[number], "id" | "projectId" | "contentType" | "pageIndex" | "status">>;
+          story: Array<Omit<NonNullable<Project["pages"]>[number], "id" | "projectId" | "contentType" | "pageIndex" | "status">>;
+        };
+      } | null;
+      if (!response.ok || !result?.success || !result.data) {
+        throw new Error(result?.error || `Kimi 生成失败（${response.status}）`);
+      }
+      const generatedAt = new Date().toISOString();
+      state.projects[index] = {
+        ...state.projects[index],
+        status: "review_needed",
+        currentStep: "Kimi 文案与图片提示词生成完成",
+        updatedAt: generatedAt,
+        consistencySettings: result.data.consistencySettings,
+        pages: [
+          ...result.data.science.map((page, pageIndex) => ({
+            ...page,
+            id: `${id}-science-${pageIndex}`,
+            projectId: id,
+            contentType: "science" as const,
+            pageIndex,
+            status: "complete" as const,
+          })),
+          ...result.data.story.map((page, pageIndex) => ({
+            ...page,
+            id: `${id}-story-${pageIndex}`,
+            projectId: id,
+            contentType: "story" as const,
+            pageIndex,
+            status: "complete" as const,
+          })),
+        ],
+      };
+      saveState(state);
+      return { success: true, data: state.projects[index] } as T;
     }
     if (action === "audit") {
       state.projects[index] = {

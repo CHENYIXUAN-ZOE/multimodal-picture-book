@@ -98,3 +98,22 @@ test("full prompt system and consistency metadata are part of production generat
   assert.match(settingsUi, /storyNegativePrompt/);
   assert.match(settingsUi, /scienceKnowledgePointCountMin/);
 });
+
+test("Netlify private demo fails closed and never accepts a client API key", async () => {
+  const [proxy, login, fn] = await Promise.all([
+    load("proxy.ts"),
+    load("netlify/functions/demo-login.ts"),
+    load("netlify/functions/kimi-generate.ts"),
+  ]);
+  assert.match(proxy, /verifySessionToken/);
+  assert.match(proxy, /status: 401/);
+  assert.match(login, /configuredPassword\.length < 12/);
+  assert.match(login, /"HttpOnly"/);
+  assert.match(login, /"SameSite=Strict"/);
+  assert.match(login, /windowLimit: 5/);
+  assert.match(fn, /process\.env\.MOONSHOT_API_KEY/);
+  assert.doesNotMatch(fn, /input\.apiKey|body\.apiKey|payload\.apiKey/);
+  assert.match(fn, /acknowledgeCost !== true/);
+  assert.match(fn, /windowLimit: 3/);
+  assert.match(fn, /reserveDailyCall/);
+});

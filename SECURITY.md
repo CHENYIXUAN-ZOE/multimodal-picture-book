@@ -23,6 +23,15 @@
 - 删除项目会删除本项目 `storage/projects/<项目ID>` 下对应素材
 - 项目导出不包含 API 密钥或环境变量
 
+## Netlify 私人演示边界
+
+- `PROTECTED_PAGE_PASSWORD` 和 `MOONSHOT_API_KEY` 只能作为 Netlify Secret 配置
+- 未登录请求不能访问页面或 Kimi Function；伪造会话 Cookie 会被拒绝
+- Function 不接受客户端传入的 API Key 或自定义供应商地址
+- Function 检查同源、费用确认、IP 限流和每日持久化上限
+- 仅文本、分镜和图片提示词发送给 Kimi；不上传 SQLite、本地图片或密钥文件
+- 演示结果保存在当前浏览器，清理站点数据会删除这些结果
+
 ## 音频保留接口
 
 `POST /api/v1/pages/:id/regenerate-audio` 固定返回 `501` 和

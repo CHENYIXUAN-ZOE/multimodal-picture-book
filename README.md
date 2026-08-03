@@ -86,3 +86,28 @@ npm audit
 ```
 
 更多安全边界见 [SECURITY.md](./SECURITY.md)。
+
+## Netlify 私人 Kimi 演示版
+
+Netlify 版使用密码门、签名 `HttpOnly` Cookie 和服务端 Function 调用 Kimi。GitHub 和浏览器均不保存或返回完整 Key。项目和生成结果仍只保存在当前浏览器的 `localStorage`，不会同步本地 SQLite。
+
+必须在 Netlify 控制台中配置，不得写入仓库：
+
+```text
+PROTECTED_PAGE_PASSWORD=<至少 12 位，建议使用随机强密码>
+MOONSHOT_API_KEY=<Kimi API Key>
+KIMI_REGION=cn
+KIMI_MODEL=kimi-k2.6
+KIMI_DAILY_LIMIT=12
+```
+
+安全控制：
+
+- 未配置密码时默认拒绝访问，不会失败后放行
+- 登录会话 8 小时后失效，Cookie 设置 `HttpOnly` / `Secure` / `SameSite=Strict`
+- 每次 Kimi 生成必须在页面明确确认费用
+- 生成函数每 IP 每分钟最多 3 次，每日上限默认 12 次
+- 每日计数使用 Netlify Blobs 强一致存储；计数不可用时默认停止付费请求
+- Kimi 调用只允许官方国内站或国际站端点
+
+回滚：从 Netlify Deploys 恢复上一个已验证的生产部署，或在 Git 中回到引入私人演示功能前的提交 `c66dd26`。
