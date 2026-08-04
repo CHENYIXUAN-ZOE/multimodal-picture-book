@@ -499,7 +499,13 @@ export function StudioApp() {
               <ShieldCheck size={20} />
             </div>
             <div>
-              <strong>{isPublicDemo ? "公开演示模式" : "单机安全模式"}</strong>
+              <strong>
+                {isPrivateDemo
+                  ? "Kimi 私人演示模式"
+                  : isPublicDemo
+                    ? "公开演示模式"
+                    : "单机安全模式"}
+              </strong>
               <span>{isPublicDemo ? "数据只存在当前浏览器" : "数据只住在这台电脑"}</span>
             </div>
             <span className="live-dot" />
@@ -946,7 +952,9 @@ function DashboardView({
           </h2>
           <p>
             {isPublicDemo
-              ? "在线安全体验科普与故事绘本工作流；演示版不会连接任何付费 API。"
+              ? isPrivateDemo
+                ? "在线体验完整绘本工作流；只有你明确确认后才会调用 Kimi，并可能产生 API 费用。"
+                : "在线安全体验科普与故事绘本工作流；公开演示版不会连接任何付费 API。"
               : "一次创作，同时得到科普绘本与故事绘本。默认使用本地模式，不触发任何付费 API。"}
           </p>
           <div className="hero-actions">

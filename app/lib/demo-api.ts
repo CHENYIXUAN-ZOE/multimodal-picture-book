@@ -5,8 +5,22 @@ import type {
   ServiceStatus,
   Subject,
 } from "@/shared/types";
+import {
+  DEFAULT_SCIENCE_IMAGE_PROMPT_GUIDE,
+  DEFAULT_SCIENCE_IMAGE_STYLE,
+  DEFAULT_SCIENCE_IMAGE_STYLE_PROMPT,
+  DEFAULT_SCIENCE_NEGATIVE_PROMPT,
+  DEFAULT_SCIENCE_PROMPT,
+  DEFAULT_STORY_IMAGE_PROMPT_GUIDE,
+  DEFAULT_STORY_IMAGE_STYLE,
+  DEFAULT_STORY_IMAGE_STYLE_PROMPT,
+  DEFAULT_STORY_NEGATIVE_PROMPT,
+  DEFAULT_STORY_PROMPT,
+  IMAGE_STYLE_PRESETS,
+} from "@/server/prompt-presets";
 
 const STORAGE_KEY = "multimodal-picture-book-public-demo-v1";
+const SETTINGS_SCHEMA_VERSION = 2;
 const now = "2026-07-28T08:00:00.000Z";
 const privateDemo = process.env.NEXT_PUBLIC_DEPLOYMENT_MODE === "private-demo";
 
@@ -173,27 +187,23 @@ const defaultSettings: AppSettings = {
   storyPageCount: 8,
   scienceKnowledgePointCountMin: 6,
   scienceKnowledgePointCountMax: 9,
-  scienceImageStyle: "皮克斯 3D",
-  storyImageStyle: "水彩手绘",
-  imageStyle: "灵动童趣、柔和光线、清晰主体、适合儿童阅读",
-  scienceImageStylePrompt: "明亮而有层次的儿童科普绘本，主体清晰，造型准确，画面富有探索感。",
-  scienceNegativePrompt: "避免文字、水印、恐怖元素、畸形肢体、模糊主体和错误科学结构。",
-  scienceImagePromptGuide: "描述主体、动作、环境、构图、光线与色彩，并确保科学特征准确。",
-  storyImageStylePrompt: "温暖灵动的水彩手绘儿童绘本，角色表情丰富，画面有连续叙事感。",
-  storyNegativePrompt: "避免文字、水印、成人化造型、惊悚内容、角色外观不一致。",
-  storyImagePromptGuide: "保持角色造型一致，清楚描述情绪、动作、场景和镜头语言。",
-  imageStylePresets: [
-    { name: "童趣水彩", stylePrompt: "温暖水彩、柔和纸张纹理、灵动笔触", negativePrompt: "写实摄影、水印、文字" },
-    { name: "彩铅手绘", stylePrompt: "细腻彩铅、明快配色、儿童绘本构图", negativePrompt: "阴暗、惊悚、模糊" },
-    { name: "黏土 3D", stylePrompt: "圆润黏土质感、柔和棚拍光、可爱比例", negativePrompt: "尖锐、成人化、文字" },
-  ],
+  scienceImageStyle: DEFAULT_SCIENCE_IMAGE_STYLE,
+  storyImageStyle: DEFAULT_STORY_IMAGE_STYLE,
+  imageStyle: DEFAULT_SCIENCE_IMAGE_STYLE_PROMPT,
+  scienceImageStylePrompt: DEFAULT_SCIENCE_IMAGE_STYLE_PROMPT,
+  scienceNegativePrompt: DEFAULT_SCIENCE_NEGATIVE_PROMPT,
+  scienceImagePromptGuide: DEFAULT_SCIENCE_IMAGE_PROMPT_GUIDE,
+  storyImageStylePrompt: DEFAULT_STORY_IMAGE_STYLE_PROMPT,
+  storyNegativePrompt: DEFAULT_STORY_NEGATIVE_PROMPT,
+  storyImagePromptGuide: DEFAULT_STORY_IMAGE_PROMPT_GUIDE,
+  imageStylePresets: IMAGE_STYLE_PRESETS,
   model: "kimi-k2.6",
   kimiEnabled: false,
   kimiRegion: "cn",
   generationMode: "local",
   dailyAiCallLimit: 0,
-  sciencePrompt: "你是一位儿童科普绘本作者。请围绕 {topic}，为 {age} 儿童创作准确、清晰、有趣的分镜内容。",
-  storyPrompt: "你是一位儿童故事绘本作者。请围绕 {topic}，为 {age} 儿童创作温暖、有起伏且适合亲子阅读的故事。",
+  sciencePrompt: DEFAULT_SCIENCE_PROMPT,
+  storyPrompt: DEFAULT_STORY_PROMPT,
 };
 
 const services: ServiceStatus = {
@@ -218,6 +228,7 @@ const services: ServiceStatus = {
 };
 
 type DemoState = {
+  settingsSchemaVersion?: number;
   projects: Project[];
   subjects: Subject[];
   settings: AppSettings;
@@ -226,6 +237,7 @@ type DemoState = {
 
 function initialState(): DemoState {
   return {
+    settingsSchemaVersion: SETTINGS_SCHEMA_VERSION,
     projects: [demoProject],
     subjects,
     settings: {
@@ -243,6 +255,25 @@ function loadState(): DemoState {
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     const state = saved ? (JSON.parse(saved) as DemoState) : initialState();
+    if (state.settingsSchemaVersion !== SETTINGS_SCHEMA_VERSION) {
+      state.settings = {
+        ...state.settings,
+        scienceImageStyle: defaultSettings.scienceImageStyle,
+        storyImageStyle: defaultSettings.storyImageStyle,
+        imageStyle: defaultSettings.imageStyle,
+        scienceImageStylePrompt: defaultSettings.scienceImageStylePrompt,
+        scienceNegativePrompt: defaultSettings.scienceNegativePrompt,
+        scienceImagePromptGuide: defaultSettings.scienceImagePromptGuide,
+        storyImageStylePrompt: defaultSettings.storyImageStylePrompt,
+        storyNegativePrompt: defaultSettings.storyNegativePrompt,
+        storyImagePromptGuide: defaultSettings.storyImagePromptGuide,
+        imageStylePresets: defaultSettings.imageStylePresets,
+        sciencePrompt: defaultSettings.sciencePrompt,
+        storyPrompt: defaultSettings.storyPrompt,
+      };
+      state.settingsSchemaVersion = SETTINGS_SCHEMA_VERSION;
+      saveState(state);
+    }
     if (privateDemo) {
       state.settings = {
         ...state.settings,
@@ -333,7 +364,13 @@ export async function demoApi<T>(path: string, options: RequestInit = {}): Promi
     return { success: true, data: state.settings, services } as T;
   }
   if (pathname === "/settings/reset-prompts" && method === "POST") {
-    state.settings = defaultSettings;
+    state.settings = {
+      ...defaultSettings,
+      kimiEnabled: privateDemo,
+      generationMode: privateDemo ? "kimi" : "local",
+      dailyAiCallLimit: privateDemo ? 12 : 0,
+    };
+    state.settingsSchemaVersion = SETTINGS_SCHEMA_VERSION;
     saveState(state);
     return { success: true, data: state.settings, services } as T;
   }

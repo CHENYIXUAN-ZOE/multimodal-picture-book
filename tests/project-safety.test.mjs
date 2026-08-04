@@ -117,3 +117,13 @@ test("Netlify private demo fails closed and never accepts a client API key", asy
   assert.match(fn, /windowLimit: 3/);
   assert.match(fn, /reserveDailyCall/);
 });
+
+test("browser demo uses complete shared prompt presets and migrates stale prompt settings", async () => {
+  const source = await load("app/lib/demo-api.ts");
+  assert.match(source, /DEFAULT_SCIENCE_PROMPT/);
+  assert.match(source, /DEFAULT_STORY_PROMPT/);
+  assert.match(source, /DEFAULT_SCIENCE_IMAGE_PROMPT_GUIDE/);
+  assert.match(source, /DEFAULT_STORY_IMAGE_PROMPT_GUIDE/);
+  assert.match(source, /SETTINGS_SCHEMA_VERSION/);
+  assert.doesNotMatch(source, /你是一位儿童科普绘本作者。请围绕 \{topic\}/);
+});
